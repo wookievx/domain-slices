@@ -39,7 +39,7 @@ object MyTypeclass with
 
   def example() =
     usage(Simple(Simplest(44))) // does compile
-    usage(Advanced(Simple(Simplest(44)), Simplest(1))) //does not compile
+    usage(Advanced(Simple(Simplest(44)), Simplest(1))) //does compile with workaround
     given proof: MyTypeclass[Simple, Simplest] = derived
     usage(Advanced(Simple(Simplest(44)), Simplest(1))) //does compile
   
