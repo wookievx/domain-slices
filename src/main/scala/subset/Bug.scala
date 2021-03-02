@@ -22,7 +22,12 @@ object MyTypeclass with
         summonFrom {
           case proof: MyTypeclass[Tuple.Elem[A, Pos], Expecting] => //cannot work with "derived", but when derived instance is defined explicitly in the scope it works
           case _ =>
-            error("Failed to derive or summon Bugged")
+            summonFrom {
+              case ma: Mirror.ProductOf[Tuple.Elem[A, Pos]] =>
+                derived[Tuple.Elem[A, Pos], Expecting](using ma)
+              case _ =>
+                error("Failed to derive or summon Bugged")
+            }
         }
 
   case class Simplest(a: Int)
@@ -34,7 +39,7 @@ object MyTypeclass with
 
   def example() =
     usage(Simple(Simplest(44))) // does compile
-    // usage(Advanced(Simple(Simplest(44)), Simplest(1))) //does not compile
+    usage(Advanced(Simple(Simplest(44)), Simplest(1))) //does not compile
     given proof: MyTypeclass[Simple, Simplest] = derived
     usage(Advanced(Simple(Simplest(44)), Simplest(1))) //does compile
   
