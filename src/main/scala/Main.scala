@@ -6,9 +6,8 @@ object Main with
 
   def main(args: Array[String]): Unit = 
     workOnSmall(Large(1, 2, "42"))
-    given proof: SubsetOf[Small, Large] = SubsetOf.derive
+    // given proof: SubsetOf[Small, Large] = SubsetOf.derive
     workRecursive(LargeRecurse(1, 2, Large(3, 4, "42")))
-    MyTypeclass.example()
 
   def msg = "I was compiled by dotty :)"
 
@@ -20,8 +19,11 @@ object Main with
 
   def workRecursive[T](arg: T)(using SmallRecurse SubsetOf T): Unit =
     val small = arg.extract
-    small.copy(c = small.c.copy(b = 420))
+    println(s"Started with: $arg")
+    val updated = small.copy(c = small.c.copy(b = 420))
     println(s"Got small (recursive): $small")
+    val res = arg.withSubset(updated)
+    println(s"Got large (recursive): $res, update: $updated")
 
   case class Large(a: Int, b: Int, c: String)
   case class Small(a: Int, b: Int)

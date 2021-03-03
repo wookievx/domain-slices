@@ -10,40 +10,51 @@ trait SubsetOf[S, T] with
   def applyOn(on: T, subset: S): T
   extension (on: T)
     inline def extract: S = extractFrom(on)
-    inline def withSlice(slice: S): T = applyOn(on, slice)
+    inline def withSubset(subset: S): T = applyOn(on, subset)
   end extension
 end SubsetOf
 
 
 object SubsetOf with
 
-  inline given derive[S, T](using ms: Mirror.Of[S], mt: Mirror.Of[T]): SubsetOf[S, T] =
-    inline ms match
+  inline given default[S, T]: SubsetOf[S, T] = derive[S, T]
+
+  inline def derive[S, T]: SubsetOf[S, T] =
+    summonFrom {
       case ms: Mirror.ProductOf[S] => 
-        inline mt match
+        summonFrom {
           case mt: Mirror.ProductOf[T] => deriveProduct[S, T](using ms, mt)
           case _ => error("Both types need to be product")
-      case _ => 
+        }
+      case _ =>
         error("Only products are supported for now")
+    }
 
+  //extracting subset implementation  
   inline def deriveProduct[S, T](using ms: Mirror.ProductOf[S], mt: Mirror.ProductOf[T]): SubsetOf[S, T] =
     val extractor = extractAllFinal[ms.MirroredElemLabels, ms.MirroredElemTypes, mt.MirroredElemLabels, mt.MirroredElemTypes]
+    val applier = applyAll[ms.MirroredElemLabels, ms.MirroredElemTypes, mt.MirroredElemLabels, mt.MirroredElemTypes]
     new SubsetOf[S, T]:
-      def extractFrom(from: T): S = ms.fromProduct(Tuple.fromIArray(extractor(Tuple.fromProduct(from.asInstanceOf[Product]).toIArray)))
-      def applyOn(on: T, subset: S): T = ???
+      def extractFrom(from: T): S = 
+        val inputArray = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
+        ms.fromProduct(Tuple.fromIArray(extractor(inputArray)))
+      def applyOn(on: T, subset: S): T =
+        val onInputArray = Tuple.fromProduct(on.asInstanceOf[Product]).toIArray
+        val subsetArray = Tuple.fromProduct(subset.asInstanceOf[Product]).toIArray
+        mt.fromProduct(Tuple.fromIArray(applier(onInputArray, subsetArray)))
 
   inline def extractAllFinal[SLabels <: Tuple, SValues <: Tuple, TLabels <: Tuple, TValues <: Tuple]: IArray[Any] => IArray[Any] =
     val functions = extractAllFinalImpl[SLabels, SValues, TLabels, TValues](List.empty)
     (array: IArray[Any]) => 
       val arr = new Array[Any](constValue[Tuple.Size[SLabels]])
-      for (fun, pos) <- functions.zipWithIndex do
+      for (fun, pos) <- functions.reverseIterator.zipWithIndex do
         arr(pos) = fun(array)
       IArray.unsafeFromArray(arr)
   
   inline def extractAllFinalImpl[SLabels <: Tuple, SValues <: Tuple, TLabels <: Tuple, TValues <: Tuple](functions: List[IArray[Any] => Any]): List[IArray[Any] => Any] =
     inline (erasedValue[SLabels], erasedValue[SValues]) match
       case _: (label *: slabels, value *: svalues) =>
-        extractAllFinalImpl[slabels, svalues, TLabels, TValues](functions :+ extractFinal[label, value, TLabels, TValues])
+        extractAllFinalImpl[slabels, svalues, TLabels, TValues](extractFinal[label, value, TLabels, TValues] :: functions)
       case _ =>
         functions
 
@@ -62,20 +73,8 @@ object SubsetOf with
               case s: (Value SubsetOf Tuple.Elem[TValues, 0]) =>
                 (ar: IArray[Any]) => s.extractFrom(ar(constValue[Pos]).asInstanceOf[Tuple.Elem[TValues, 0]])
               case _ =>
-                summonFrom {
-                  case mv: Mirror.Of[Value] =>
-                    summonFrom {
-                      case mt: Mirror.Of[Tuple.Elem[TValues, 0]] =>
-                        val derived = derive[Value, Tuple.Elem[TValues, 0]](using mv, mt)
-                        (ar: IArray[Any]) => derived.extractFrom(ar(constValue[Pos]).asInstanceOf[Tuple.Elem[TValues, 0]])
-                      case _ =>
-                        import scala.compiletime.ops.string._
-                        error(constValue["Illegal type of value at position (not found tuple elem): " + ToString[Pos] + " in " + TupleToString[TLables, ""]])       
-                    }
-                  case _ =>
-                    import scala.compiletime.ops.string._
-                    error(constValue["Illegal type of value at position (not found value)): " + ToString[Pos] + " in " + TupleToString[TLables, ""]])   
-                }              
+                import scala.compiletime.ops.string._
+                error(constValue["Illegal type of value in " + TupleToString[TLables, ""]])              
             }
       case _ => 
         inline (erasedValue[TLables], erasedValue[TValues]) match
@@ -85,56 +84,44 @@ object SubsetOf with
             import scala.compiletime.ops.string._
             error(constValue["Illegal type of value in " + TupleToString[TLables, ""]])
 
-  
-  inline def extractAll[S <: Tuple, T <: Tuple, P <: Tuple](inline positions: P): T => IArray[Any] = 
-    val funs = IArray.unsafeFromArray(extractAllImpl[S, T, P, 0](positions, 0, new Array[IArray[Any] => Any](constValue[Tuple.Size[S]])))
-    (t: T) => 
-      val input = t.toIArray
-      val res = new Array[Any](constValue[Tuple.Size[S]])
-      for (fun, ind) <- funs.zipWithIndex do res(ind) = fun(input)
-      IArray.unsafeFromArray(res)
+  //applying subset implementation
+  inline def applyAll[SLabels <: Tuple, SValues <: Tuple, TLabels <: Tuple, TValues <: Tuple]: (IArray[Any], IArray[Any]) => IArray[Any] =
+    val functions = applyAllImpl[SLabels, SValues, TLabels, TValues, 0](List.empty)
+    (on: IArray[Any], subset: IArray[Any]) =>
+      val outArray: Array[Any] = new Array[Any](on.length)
+      on.copyToArray(outArray)
+      for fun <- functions do fun(outArray, subset)
+      IArray.unsafeFromArray(outArray)
 
-  private inline def extractAllImpl[S <: Tuple, T <: Tuple, P <: Tuple, F <: Int](inline postions: P, focus: F, elems: Array[IArray[Any] => Any]): Array[IArray[Any] => Any] =
-    inline erasedValue[P] match
-      case _ : (h *: tail) =>
-        inline constValue[h] match
-          case i: Int =>
-            elems(focus) = extractSingleImpl[i.type, Tuple.Elem[S, F], T](i)
-            extractAllImpl[S, T, tail, F + 1](postions.drop(1).asInstanceOf[tail], (focus + 1).asInstanceOf[F + 1], elems)
+
+  inline def applyAllImpl[SLabels <: Tuple, SValues <: Tuple, TLabels <: Tuple, TValues <: Tuple, SPos <: Int](functions: List[(Array[Any], IArray[Any]) => Unit]): List[(Array[Any], IArray[Any]) => Unit] =
+    inline (erasedValue[SLabels], erasedValue[SValues]) match
+      case _: (label *: slabels, value *: svalues) => 
+        val fun = (on: Array[Any], subset: IArray[Any]) => applyImpl[label, value, TLabels, TValues, 0](on, subset(constValue[SPos]))
+        applyAllImpl[slabels, svalues, TLabels, TValues, SPos + 1](fun :: functions)
+      case _ => functions
+
+  inline def applyImpl[Label, Value, TLabels <: Tuple, TValues <: Tuple, Pos <: Int]: (Array[Any], Any) => Unit =
+    inline erasedValue[Tuple.Elem[TLabels, 0]] match
+      case _: Label =>
+        inline erasedValue[Tuple.Elem[TValues, 0]] match
+          case _: Value =>
+            (ar: Array[Any], mod: Any) => ar(constValue[Pos]) = mod
           case _ =>
-            error("Unexpected value in positions")
-      case EmptyTuple =>
-        elems 
-
-  inline def allPositionsOf[S <: Tuple, T <: Tuple]: Map[Int, Int] =
-    allPostitionOfImpl[S, T](0, Map.empty)
-  
-  private inline def allPostitionOfImpl[S <: Tuple, T <: Tuple](inline focus: Int, builder: Map[Int, Int]): Map[Int, Int] =
-    inline erasedValue[S] match
-      case _: (h *: tail) =>
-        allPostitionOfImpl[tail, T](focus + 1, builder + (focus -> positionOf[h, T]))
-      case EmptyTuple => builder
-
-
-  inline def extractSingleImpl[P <: Int, V, T <: Tuple](inline expectedPostion: Int): IArray[Any] => Any =
-    inline erasedValue[Tuple.Elem[T, P]] match
-      case _: V => (array: IArray[Any]) => array(expectedPostion)
+            summonFrom {
+              case s: (Value SubsetOf Tuple.Elem[TValues, 0]) =>
+                (ar: Array[Any], mod: Any) => ar(constValue[Pos]) = s.applyOn(ar(constValue[Pos]).asInstanceOf, mod.asInstanceOf)
+              case _ =>
+                import scala.compiletime.ops.string._
+                error(constValue["Illegal type of value at position: " + ToString[Pos] + " in " + TupleToString[TLabels, ""]])
+            }
       case _ =>
-        summonFrom {
-          case s: SubsetOf[V, Tuple.Elem[T, P]] => (array: IArray[Any]) => 
-            s.extractFrom(array(expectedPostion).asInstanceOf[Tuple.Elem[T, P]])
+        inline (erasedValue[TLabels], erasedValue[TValues]) match
+          case _: (h *: tlabels, _ *: tvalues) =>
+            applyImpl[Label, Value, tlabels, tvalues, Pos + 1]
           case _ =>
-            error(constExtractMessage[T])
-        }
-
-  transparent inline def positionOf[L, T <: Tuple]: Int = 
-    positionImpl[L, T](0, constMessage[L, T])
-
-  private inline def positionImpl[L, T <: Tuple](inline acc: Int, inline message: String): Int =
-    inline erasedValue[T] match
-      case _: (L *: _) => acc
-      case _: (_ *: tail) => positionImpl[L, tail](acc + 1, message)
-      case EmptyTuple => error(message)
+            import scala.compiletime.ops.string._
+            error(constValue["Not found in target type a key"])
 
   import scala.compiletime.ops.string._
   
@@ -150,6 +137,5 @@ object SubsetOf with
         TupleToString[tail, Z + ", " + h]
       case EmptyTuple => 
         Z
-    
 
 end SubsetOf
