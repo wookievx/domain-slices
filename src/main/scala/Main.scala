@@ -6,7 +6,6 @@ object Main with
 
   def main(args: Array[String]): Unit = 
     workOnSmall(Large(1, 2, "42"))
-    // given proof: SubsetOf[Small, Large] = SubsetOf.derive
     workRecursive(LargeRecurse(1, 2, Large(3, 4, "42")))
 
   def msg = "I was compiled by dotty :)"
