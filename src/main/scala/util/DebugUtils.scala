@@ -2,7 +2,7 @@ package util
 
 import scala.quoted.*
 
-object DebugUtils with
+object DebugUtils:
 
   inline def debug[T](inline any: T): T = ${ printImplMacro('any) }
 

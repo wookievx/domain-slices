@@ -5,7 +5,7 @@ import scala.compiletime.ops.int._
 import scala.collection.mutable.Builder
 import util.DebugUtils
 
-trait SubsetOf[S, T] with
+trait SubsetOf[S, T]:
   def extractFrom(from: T): S
   def applyOn(on: T, subset: S): T
   extension (on: T)
@@ -15,9 +15,37 @@ trait SubsetOf[S, T] with
 end SubsetOf
 
 
-object SubsetOf with
+object SubsetOf:
+  abstract class SpecificSubsetOf[S, T](extractFn: T => S, applyFn: (T, S) => T) extends SubsetOf[S, T]:
+    override def extractFrom(from: T): S = extractFn(from)
+    override def applyOn(on: T, subset: S): T = applyFn(on, subset)
 
-  inline given default[S, T]: SubsetOf[S, T] = derive[S, T]
+  inline def deriveConcrete[S, T, Concrete <: SubsetOf[S, T]](build: (T => S, (T, S) => T) => Concrete): Concrete =
+    summonFrom {
+      case ms: Mirror.ProductOf[S] => 
+        summonFrom {
+          case mt: Mirror.ProductOf[T] => deriveProductConcrete[S, T, Concrete](build)(using ms, mt)
+          case _ => error("Both types need to be product")
+        }
+      case _ =>
+        error("Only products are supported for now")
+    }
+
+  inline def deriveProductConcrete[S, T, Concrete <: SubsetOf[S, T]](build: (T => S, (T, S) => T) => Concrete)(using ms: Mirror.ProductOf[S], mt: Mirror.ProductOf[T]): Concrete =
+    DebugUtils.debug {
+      build(
+        (from: T) =>
+          val inputArray = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
+          val outputArray = extractAllFinal[ms.MirroredElemLabels, ms.MirroredElemTypes, mt.MirroredElemLabels, mt.MirroredElemTypes](inputArray)
+          ms.fromProduct(Tuple.fromIArray(outputArray)),
+        (on: T, subset: S) => 
+          val onInputArray = Tuple.fromProduct(on.asInstanceOf[Product]).toIArray
+          val subsetArray = Tuple.fromProduct(subset.asInstanceOf[Product]).toIArray
+          val outputArray = applyAll[ms.MirroredElemLabels, ms.MirroredElemTypes, mt.MirroredElemLabels, mt.MirroredElemTypes](onInputArray, subsetArray)
+          mt.fromProduct(Tuple.fromIArray(outputArray))
+      )
+    }
+    
 
   inline def derive[S, T]: SubsetOf[S, T] = 
     summonFrom {

@@ -103,7 +103,7 @@ object Slice {
 }
 
 
-trait Slice[T, S] with
+trait Slice[T, S]:
   def extractFrom(from: T): S
   def applyOn(on: T, slice: S): T
   extension (on: T)
