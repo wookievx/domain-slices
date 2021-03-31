@@ -10,7 +10,16 @@ case class GiantClass(
   g: (Int, String),
   h: Long,
   i: Map[Int, String],
-  j: Short
+  j: Short,
+  k: Int = 0,
+  l: Int = 0,
+  m: Int = 0,
+  n: Int = 0,
+  o: Int = 1,
+  p: Int = 1,
+  r: Int = 1,
+  s: Int = 1,
+  t: Int = 2
 )
 
 case class GiantClassSubset[S](extractFn: GiantClass => S, applyFn: (GiantClass, S) => GiantClass) extends SubsetOf.SpecificSubsetOf[S, GiantClass](extractFn, applyFn)
@@ -24,7 +33,8 @@ case class LargeClass(
   g: (Int, String),
   h: Long,
   i: Map[Int, String],
-  j: Short
+  j: Short,
+  t: Int
 ) derives GiantClassSubset
 
 def workOnLarge[T](arg: T)(using LargeClass SubsetOf T): Unit =
