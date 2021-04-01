@@ -20,3 +20,7 @@ project/plugins/project/
 .dotty-ide-artifact
 .dotty-ide.json
 default.properties
+.metals/
+.vscode/
+.bloop/
+metals.sbt
