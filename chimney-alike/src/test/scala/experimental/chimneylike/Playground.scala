@@ -22,6 +22,12 @@ object Playground extends TestSuite:
       }
 
     }
+
+    "selectors" - {
+      "provide name of the field" - {
+        MacroUtils.extracNameFromSelector[MyDefaultingClass, Int](_.a) ==> "a"
+      }
+    }
   }
 
   import scala.compiletime.error

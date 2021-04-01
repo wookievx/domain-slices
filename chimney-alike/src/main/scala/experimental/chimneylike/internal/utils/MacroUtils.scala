@@ -8,7 +8,7 @@ object MacroUtils:
   inline def getDefaultParams[T]: Map[String, AnyRef] = ${ getDefaultParmasImpl[T] }
   //copied from : https://github.com/dotty-staging/upickle/blob/0213eea95b282b1e961b1d5ad68031365c9a8bb2/implicits/src-3/upickle/implicits/macros.scala
   def getDefaultParmasImpl[T: Type](using Quotes): Expr[Map[String, AnyRef]] =
-    import quotes.reflect._
+    import quotes.reflect.*
     val sym = TypeTree.of[T].symbol
 
     if (sym.isClassDef) {
@@ -35,7 +35,7 @@ object MacroUtils:
   inline def nameExistsIn[T](inline name: String): Boolean = ${ nameExistsInImpl[T]('name) }
 
   def nameExistsInImpl[T: Type](name: Expr[String])(using Quotes): Expr[Boolean] =
-    import quotes.reflect._
+    import quotes.reflect.*
     val sym = TypeTree.of[T].symbol
 
     if (sym.isClassDef) {
@@ -51,5 +51,15 @@ object MacroUtils:
       Expr(false)
     }
   end nameExistsInImpl
+
+  inline def extracNameFromSelector[To, T](inline code: To => T): String = ${extractNameFromSelectorImpl('code)}
+
+  def extractNameFromSelectorImpl[To: Type, T: Type](code: Expr[To => T])(using Quotes): Expr[String] = 
+    import quotes.reflect.*
+    code.asTerm match
+     case Inlined(_, _, Lambda(_, Select(_, name))) => Expr(name)
+     case t => report.throwError(s"Illegal argument to extractor: ${code.show}, in tasty: $t")
+
+  
 
 end MacroUtils
