@@ -1,6 +1,7 @@
 package experimental.chimneylike.dsl
 
-import experimental.chimneylike.internal.TransformerFlags.*
+import experimental.chimneylike.internal.TransformerFlag.*
+import experimental.chimneylike.internal.dsl.TransformerDefinitionBuilder
 import experimental.chimneylike.internal.*
 import experimental.chimneylike.Transformer
 import experimental.chimneylike.internal.utils.MacroUtils
@@ -11,10 +12,10 @@ import experimental.chimneylike.internal.utils.MacroUtils
   * @tparam To   type of output value
   * @tparam C    type-level encoded config
   */
-final class TransformerDefinition[From, To, C <: TransformerCfg, Flags <: TransformerFlags](
+final class TransformerDefinition[From, To, Config <: Tuple, Flags <: Tuple](
     val overrides: Map[String, Any],
     val instances: Map[(String, String), Any]
-) extends FlagsDsl[[F1 <: TransformerFlags] =>> TransformerDefinition[From, To, C, F1], Flags] {
+) extends FlagsDsl[[FS <: Tuple] =>> TransformerDefinition[From, To, Config, FS], Flags] {
 
   /** Use `value` provided here for field picked using `selector`.
     *
@@ -25,11 +26,7 @@ final class TransformerDefinition[From, To, C <: TransformerCfg, Flags <: Transf
     * @param value    constant value to use for the target field
     * @return [[experimental.chimneylike.dsl.TransformerDefinition]]
     */
-  inline def withFieldConst[T, U](inline selector: To => T, value: U): TransformerDefinition[From, To, _ <: TransformerCfg, Flags] = 
-    new TransformerDefinition(
-      overrides.updated(MacroUtils.extracNameFromSelector(selector), value),
-      instances
-    )
+  transparent inline def withFieldConst[T](inline selector: To => T, value: T) = TransformerDefinitionBuilder.withFieldConst[From, To, Config, Flags, T](this)(selector, value)
 
   /** Use `map` provided here to compute value of field picked using `selector`.
     *
@@ -40,10 +37,10 @@ final class TransformerDefinition[From, To, C <: TransformerCfg, Flags <: Transf
     * @param map      function used to compute value of the target field
     * @return [[experimental.chimneylike.dsl.TransformerDefinition]]
     */
-  def withFieldComputed[T, U](
+  transparent inline def withFieldComputed[T](
       selector: To => T,
-      map: From => U
-  ): TransformerDefinition[From, To, _ <: TransformerCfg, Flags] = ???
+      map: From => T
+  ) = ???
 
   /** Use `selectorFrom` field in `From` to obtain the value of `selectorTo` field in `To`
     *
@@ -54,10 +51,10 @@ final class TransformerDefinition[From, To, C <: TransformerCfg, Flags <: Transf
     * @param selectorTo   target field in `To`, defined like `_.newName`
     * @return [[experimental.chimneylike.dsl.TransformerDefinition]]
     */
-  def withFieldRenamed[T, U](
+  transparent inline def withFieldRenamed[T](
       selectorFrom: From => T,
-      selectorTo: To => U
-  ): TransformerDefinition[From, To, _ <: TransformerCfg, Flags] = ???
+      selectorTo: To => T
+  ) = ???
 
   /** Use `f` to calculate the (missing) coproduct instance when mapping one coproduct into another.
     *
@@ -70,7 +67,7 @@ final class TransformerDefinition[From, To, C <: TransformerCfg, Flags <: Transf
     * @param f function to calculate values of components that cannot be mapped automatically
     * @return [[experimental.chimneylike.dsl.TransformerDefinition]]
     */
-  def withCoproductInstance[Inst](f: Inst => To): TransformerDefinition[From, To, _ <: TransformerCfg, Flags] = ???
+  transparent inline def withCoproductInstance[Inst](f: Inst => To) = ???
 
   /** Build Transformer using current configuration.
     *
@@ -79,6 +76,8 @@ final class TransformerDefinition[From, To, C <: TransformerCfg, Flags <: Transf
     *
     * @return [[experimental.chimneylike.Transformer]] type class instance
     */
-  def buildTransformer[ScopeFlags <: TransformerFlags](using tc: TransformerConfiguration[ScopeFlags]): Transformer[From, To] = ???
+  inline def buildTransformer[ScopeFlags <: Tuple](using tc: TransformerConfiguration[ScopeFlags]): Transformer[From, To] = ???
 
 }
+
+def defaultDefinition[From, To]: TransformerDefinition[From, To, EmptyTuple, EmptyTuple] = TransformerDefinition(Map.empty, Map.empty)
