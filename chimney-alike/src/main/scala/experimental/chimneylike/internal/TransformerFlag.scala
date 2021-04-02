@@ -12,8 +12,16 @@ object TransformerFlag:
   final class UnsafeOption extends TransformerFlag
 end TransformerFlag
 
+import TransformerFlag.*
+
 type EnableFlag[Flags <: Tuple, Flag <: TransformerFlag] = Flag *: DisableFlag[Flags, Flag]
 
-type DisableFlag[Flags <: Tuple, Flag <: TransformerFlag] = Tuple.Filter[Flags, IsDifferentFlag[Flag]]
-
-type IsDifferentFlag[F] = [Flag] =>> F != Flag
+type DisableFlag[Flags <: Tuple, Flag <: TransformerFlag] <: Tuple = (Flags, Flag) match
+  case (MethodAccessors *: tail, MethodAccessors) => tail
+  case (DefaultValues *: tail, DefaultValues) => tail
+  case (BeanSetters *: tail, BeanSetters) => tail
+  case (BeanGetters *: tail, BeanGetters) => tail
+  case (OptionDefaultsToNone *: tail, OptionDefaultsToNone) => tail
+  case (UnsafeOption *: tail, UnsafeOption) => tail
+  case (h *: tail, _) => h *: DisableFlag[tail, Flag]
+  case (EmptyTuple, _) => EmptyTuple

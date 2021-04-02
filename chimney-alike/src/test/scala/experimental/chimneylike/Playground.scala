@@ -34,13 +34,33 @@ object Playground extends TestSuite:
     "TransformerDefinition" - {
       "adds withFieldConst to config" - {
         val instance: TransformerDefinition[MySourceClass, MyDefaultingClass, (TransformerCfg.FieldConst["c"], TransformerCfg.FieldConst["a"]), EmptyTuple] = 
-          defaultDefinition[MySourceClass, MyDefaultingClass]
-            .withFieldConst(_.a, 2625)
-            .withFieldConst(_.c, 420L)
+          MacroUtils.debug(
+            defaultDefinition[MySourceClass, MyDefaultingClass]
+              .withFieldConst(_.c, 9000L)
+              .withFieldConst(_.a, 2625)
+              .withFieldConst(_.c, 420L)
+          )
 
         instance.overrides.get("c") ==> Some(420L)
+        instance.overrides.get("a") ==> Some(2625)
+      }
+
+      "adds/removes any flag and compiles" - {
+        type ExampleFlags = (TransformerFlag.MethodAccessors, TransformerFlag.DefaultValues, TransformerFlag.BeanGetters)
+
+        val instance: TransformerDefinition[MySourceClass, MyDefaultingClass, EmptyTuple, ExampleFlags] =
+          defaultDefinition[MySourceClass, MyDefaultingClass]
+            .enableBeanGetters
+            .enableBeanSetters
+            .enableDefaultValues
+            .enableMethodAccessors
+            .disableBeanSetters
+
+        true ==> true
+
       }
     }
+
   }
 
   import scala.compiletime.error
