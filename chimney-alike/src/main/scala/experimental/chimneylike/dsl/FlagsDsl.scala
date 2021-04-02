@@ -9,7 +9,7 @@ trait FlagsDsl[UpdateFlags[_ <: Tuple], Flags <: Tuple]:
     *
     * @see [[https://scalalandio.github.io/chimney/transformers/customizing-transformers.html#using-method-accessors]] for more details
     */
-  inline def enableMethodAccessors: UpdateFlags[EnableFlag[Flags, TransformerFlag.MethodAccessors]] =
+  def enableMethodAccessors: UpdateFlags[EnableFlag[Flags, TransformerFlag.MethodAccessors]] =
     enableFlag[TransformerFlag.MethodAccessors]
 
   /** Disable method accessors lookup that was previously enabled by `enableMethodAccessors`
