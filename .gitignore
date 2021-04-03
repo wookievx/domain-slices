@@ -19,4 +19,12 @@ project/plugins/project/
 .bsp
 .dotty-ide-artifact
 .dotty-ide.json
+.bloop/
+.metals/
+.vscode/
+project/.bloop/
+project/project/metals.sbt
+project/metals.sbt
+metals.sbt
+
 default.properties
