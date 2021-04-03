@@ -80,6 +80,13 @@ object TransformerFDefinitionBuilder:
     compute: From => T
   ) = ${ withFieldComputedImpl('definition)('selector, 'compute) }
 
+  transparent inline def withFieldComputedF[F[_], From, To, Config <: Tuple, Flags <: Tuple, T](
+    definition: TransformerFDefinition[F, From, To, Config, Flags]
+  )(inline 
+    selector: To => T, 
+    compute: From => F[T]
+  ) = ${ withFieldComputedFImpl('definition)('selector, 'compute) }
+
   def withFieldConstImpl[F[_]: Type, From: Type, To: Type, Config <: Tuple: Type, Flags <: Tuple: Type, T: Type](
     definition: Expr[TransformerFDefinition[F, From, To, Config, Flags]]
   )(
@@ -117,6 +124,21 @@ object TransformerFDefinitionBuilder:
     compute: Expr[From => T]
   )(using Quotes): Expr[Any] = {
     GenericTransformerDefinitionBuilder.withFieldComputedImpl[[Config <: Tuple] =>> TransformerFDefinition[F, From, To, Config, Flags], From, To, Config, T](
+      definition,
+      new TransformerFDefinitionBuilder[F, From, To, Flags]
+    )(
+      selector, 
+      compute
+    )
+  }
+
+  def withFieldComputedFImpl[F[_]: Type, From: Type, To: Type, Config <: Tuple: Type, Flags <: Tuple: Type, T: Type](
+    definition: Expr[TransformerFDefinition[F, From, To, Config, Flags]]
+  )(
+    selector: Expr[To => T], 
+    compute: Expr[From => F[T]]
+  )(using Quotes): Expr[Any] = {
+    GenericTransformerDefinitionBuilder.withFieldComputedFImpl[[Config <: Tuple] =>> TransformerFDefinition[F, From, To, Config, Flags], From, To, Config, T, F](
       definition,
       new TransformerFDefinitionBuilder[F, From, To, Flags]
     )(
@@ -170,6 +192,19 @@ object GenericTransformerDefinitionBuilder:
       new ExprModifier:
         def apply[T <: String: Type](nameExpr: Expr[T]): Expr[Any] =
           builder.withField[Config, EnableConfig[Config, TransformerCfg.FieldComputed[T]]](definition, nameExpr, compute)
+    )(selector)
+
+  def withFieldComputedFImpl[Definition[_ <: Tuple], From: Type, To: Type, Config <: Tuple: Type, T: Type, F[_]: Type](
+    definition: Expr[Definition[Config]],
+    builder: FinalDefinitionBuilder[Definition]
+  )(
+    selector: Expr[To => T],
+    compute: Expr[From => F[T]]
+  )(using quotes: Quotes): Expr[Any] =
+    withFieldGenImpl[To, T](
+      new ExprModifier:
+        def apply[T <: String: Type](nameExpr: Expr[T]): Expr[Any] =
+          builder.withField[Config, EnableConfig[Config, TransformerCfg.FieldComputedF[T]]](definition, nameExpr, compute)
     )(selector)
 
   private def withFieldGenImpl[To: Type, T: Type](

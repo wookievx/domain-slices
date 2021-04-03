@@ -59,7 +59,7 @@ object Playground extends TestSuite:
       "combine diferent types of configs and flags" - {
         import TransformerCfg.*
         type ExpectedConfig = 
-          (FieldComputed["c"], FieldConst["a"], FieldConstF["b"], WrapperType[Option])
+          (FieldComputedF["d"], FieldComputed["c"], FieldConst["a"], FieldConstF["b"], WrapperType[Option])
 
         type ExpectedFlags =
           (TransformerFlag.MethodAccessors, TransformerFlag.DefaultValues)
@@ -70,13 +70,16 @@ object Playground extends TestSuite:
             .withFieldConst(_.c, 420L)
             .withFieldConst(_.a, 420)
             .withFieldComputed(_.c, s => (2 * s.a).toLong)
+            .withFieldComputedF(_.d, s => s.toString.toDoubleOption)
             .enableDefaultValues
             .enableMethodAccessors
 
         instance.overrides("c")
           .asInstanceOf[MySourceClass => Long](MySourceClass(100, "test")) ==> 200L
         instance.overrides("b") ==> Some("pig")
-        instance.overrides.get("a") ==> Some(420) 
+        instance.overrides.get("a") ==> Some(420)
+        instance.overrides("d")
+          .asInstanceOf[MySourceClass => Option[Double]](MySourceClass(100, "test")) ==> None
 
       }
 
@@ -106,5 +109,5 @@ object Playground extends TestSuite:
     inline if MacroUtils.nameExistsIn[MyDefaultingClass](name) then () else error("Failed to compile because name not found")
 
   case class MySourceClass(a: Int, b: String)
-  case class MyDefaultingClass(a: Int = 42, b: String = "lama", c: Long = 42L)
+  case class MyDefaultingClass(a: Int = 42, b: String = "lama", c: Long = 42L, d: Double)
 end Playground

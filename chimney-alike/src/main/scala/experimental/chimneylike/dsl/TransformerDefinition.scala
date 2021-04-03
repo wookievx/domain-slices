@@ -63,6 +63,18 @@ final class TransformerDefinition[From, To, Config <: Tuple, Flags <: Tuple](
     */
   transparent inline def withFieldComputed[T](inline selector: To => T, map: From => T) = 
     TransformerDefinitionBuilder.withFieldComputed(this)(selector, map)
+  
+  /** Use `map` provided here to compute value of field picked using `selector`.
+    *
+    * By default if `From` is missing field picked by `selector` compilation fails.
+    *
+    * @see [[https://scalalandio.github.io/chimney/transformers/customizing-transformers.html#providing-missing-values]] for more details
+    * @param selector target field in `To`, defined like `_.name`
+    * @param map      function used to compute value of the target field
+    * @return [[experimental.chimneylike.dsl.TransformerFDefinition]]
+    */
+  transparent inline def withFieldComputedF[F[_], T](inline selector: To => T, map: From => F[T]) = 
+    lift[F].withFieldComputedF(selector, map)
 
   /** Use `selectorFrom` field in `From` to obtain the value of `selectorTo` field in `To`
     *
