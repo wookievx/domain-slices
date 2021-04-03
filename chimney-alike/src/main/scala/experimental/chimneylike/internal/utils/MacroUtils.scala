@@ -52,7 +52,7 @@ object MacroUtils:
     }
   end nameExistsInImpl
 
-  inline def extracNameFromSelector[To, T](inline code: To => T): String = ${extractNameFromSelectorImpl('code)}
+  transparent inline def extracNameFromSelector[To, T](inline code: To => T) = ${extractNameFromSelectorImpl('code)}
 
   def extractNameFromSelectorImpl[To: Type, T: Type](code: Expr[To => T])(using Quotes): Expr[String] = 
     import quotes.reflect.*

@@ -34,15 +34,50 @@ object Playground extends TestSuite:
     "TransformerDefinition" - {
       "adds withFieldConst to config" - {
         val instance: TransformerDefinition[MySourceClass, MyDefaultingClass, (TransformerCfg.FieldConst["c"], TransformerCfg.FieldConst["a"]), EmptyTuple] = 
-          MacroUtils.debug(
-            defaultDefinition[MySourceClass, MyDefaultingClass]
+          defaultDefinition[MySourceClass, MyDefaultingClass]
               .withFieldConst(_.c, 9000L)
               .withFieldConst(_.a, 2625)
               .withFieldConst(_.c, 420L)
-          )
 
         instance.overrides.get("c") ==> Some(420L)
         instance.overrides.get("a") ==> Some(2625)
+      }
+
+      "adds withFieldFConst to config" - {
+        type Configuration = (TransformerCfg.FieldConstF["c"], TransformerCfg.FieldConstF["a"], TransformerCfg.WrapperType[Option])
+
+        val instance: TransformerFDefinition[Option, MySourceClass, MyDefaultingClass, Configuration, EmptyTuple] =
+          defaultDefinition[MySourceClass, MyDefaultingClass]
+              .withFieldConstF(_.c, Option(9000L))
+              .withFieldConstF(_.a, Some(2625))
+              .withFieldConstF(_.c, Some(420L))
+
+        instance.overrides.get("c") ==> Some(Some(420L))
+        instance.overrides.get("a") ==> Some(Some(2625))
+      }
+
+      "combine diferent types of configs and flags" - {
+        import TransformerCfg.*
+        type ExpectedConfig = 
+          (FieldComputed["c"], FieldConst["a"], FieldConstF["b"], WrapperType[Option])
+
+        type ExpectedFlags =
+          (TransformerFlag.MethodAccessors, TransformerFlag.DefaultValues)
+        
+        val instance: TransformerFDefinition[Option, MySourceClass, MyDefaultingClass, ExpectedConfig, ExpectedFlags] =
+          defaultDefinition[MySourceClass, MyDefaultingClass]
+            .withFieldConstF(_.b, Option("pig"))
+            .withFieldConst(_.c, 420L)
+            .withFieldConst(_.a, 420)
+            .withFieldComputed(_.c, s => (2 * s.a).toLong)
+            .enableDefaultValues
+            .enableMethodAccessors
+
+        instance.overrides("c")
+          .asInstanceOf[MySourceClass => Long](MySourceClass(100, "test")) ==> 200L
+        instance.overrides("b") ==> Some("pig")
+        instance.overrides.get("a") ==> Some(420) 
+
       }
 
       "adds/removes any flag and compiles" - {
