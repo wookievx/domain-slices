@@ -3,7 +3,8 @@ package experimental.chimneylike.dsl
 import experimental.chimneylike.internal.TransformerFlag.*
 import experimental.chimneylike.internal.dsl.*
 import experimental.chimneylike.internal.*
-import experimental.chimneylike.Transformer
+import experimental.chimneylike.internal.derived.TransformerDerive
+import experimental.chimneylike.*
 import experimental.chimneylike.internal.utils.MacroUtils
 
 /** Allows customization of [[io.scalaland.chimney.TransformerF]] derivation
@@ -65,5 +66,15 @@ final class TransformerFDefinition[F[_], From, To, Config <: Tuple, Flags <: Tup
     */
   transparent inline def withFieldComputedF[T](inline selector: To => T, map: From => F[T]) = 
     TransformerFDefinitionBuilder.withFieldComputedF(this)(selector, map)
+
+  /** Build Transformer using current configuration.
+    *
+    * It runs macro that tries to derive instance of `Transformer[From, To]`.
+    * When transformation can't be derived, it results with compilation error.
+    *
+    * @return [[experimental.chimneylike.TransformerF]] type class instance
+    */
+  inline def buildTransformer(using TransformerFSupport[F]): TransformerF[F, From, To] = 
+    TransformerDerive.derived[F, From, To, Config, Flags](this)
 
 end TransformerFDefinition

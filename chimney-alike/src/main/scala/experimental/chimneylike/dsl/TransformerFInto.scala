@@ -53,6 +53,7 @@ final class TransformerFInto[F[_], From, To, Config <: Tuple, Flags <: Tuple](
   transparent inline def withFieldComputedF[T](inline selector: To => T, map: From => F[T]) = 
     withDefinitionF(definition.withFieldComputedF(selector, map))
 
+
   transparent inline def withDefinitionF(inline newDefinition: Any) =
     inline newDefinition match
       case definition: TransformerFDefinition[F, From, To, config, flags] =>

@@ -13,14 +13,9 @@ object Playground extends TestSuite:
         params ==> Map("a" -> 42, "b" -> "lama", "c" -> 42L)
       }
 
-      "are checked to exist" - {
-        checkIfDefaultExistsCompileTime("a")
-        MacroUtils.nameExistsIn[MyDefaultingClass]("a") ==> true
-      }
-
       "are checked to not exist" - {
         // checkIfDefaultExistsCompileTime("z")
-        MacroUtils.nameExistsIn[MyDefaultingClass]("z") ==> false
+        MacroUtils.defaultValueExistsIn[MyDefaultingClass]("z") ==> false
       }
 
     }
@@ -100,13 +95,6 @@ object Playground extends TestSuite:
     }
 
   }
-
-  import scala.compiletime.error
-  import scala.compiletime.ops.string._
-  import scala.compiletime.constValue
-
-  inline def checkIfDefaultExistsCompileTime[N <: String](inline name: N): Unit = 
-    inline if MacroUtils.nameExistsIn[MyDefaultingClass](name) then () else error("Failed to compile because name not found")
 
   case class MySourceClass(a: Int, b: String)
   case class MyDefaultingClass(a: Int = 42, b: String = "lama", c: Long = 42L, d: Double)

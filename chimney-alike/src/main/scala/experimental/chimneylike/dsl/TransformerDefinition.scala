@@ -3,6 +3,7 @@ package experimental.chimneylike.dsl
 import experimental.chimneylike.internal.TransformerFlag.*
 import experimental.chimneylike.internal.dsl.*
 import experimental.chimneylike.internal.*
+import experimental.chimneylike.internal.derived.TransformerDerive
 import experimental.chimneylike.Transformer
 import experimental.chimneylike.internal.utils.MacroUtils
 
@@ -110,7 +111,8 @@ final class TransformerDefinition[From, To, Config <: Tuple, Flags <: Tuple](
     *
     * @return [[experimental.chimneylike.Transformer]] type class instance
     */
-  inline def buildTransformer[ScopeFlags <: Tuple](using tc: TransformerConfiguration[ScopeFlags]): Transformer[From, To] = ???
+  inline def buildTransformer: Transformer[From, To] = 
+    TransformerDerive.derived[From, To, Config, Flags](this)
 
 }
 

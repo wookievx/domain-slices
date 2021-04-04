@@ -32,9 +32,9 @@ object MacroUtils:
     }
   end getDefaultParmasImpl
 
-  inline def nameExistsIn[T](inline name: String): Boolean = ${ nameExistsInImpl[T]('name) }
+  inline def defaultValueExistsIn[T](inline name: Any): Boolean = ${ nameExistsInImpl[T]('name) }
 
-  def nameExistsInImpl[T: Type](name: Expr[String])(using Quotes): Expr[Boolean] =
+  def nameExistsInImpl[T: Type](name: Expr[Any])(using Quotes): Expr[Boolean] =
     import quotes.reflect.*
     val sym = TypeTree.of[T].symbol
 
@@ -44,9 +44,16 @@ object MacroUtils:
         for p <- sym.caseFields if p.flags.is(Flags.HasDefault)
         yield p.name
 
-      name.value match
-        case Some(name) => Expr(names.contains(name))
-        case None => report.throwError("Failed to check if name exist, probably a bug in library")
+      println(s"Checking out: ${name.show}")
+
+      name match 
+        case '{$n: String} =>
+          n.value match
+            case Some(name) =>
+              Expr(names.contains(name))
+            case _ => report.throwError("Failed to check if name exist, probably a bug in library") 
+        case _ =>
+          report.throwError("Failed to check if name exist, probably a bug in library")
     } else {
       Expr(false)
     }
@@ -82,5 +89,11 @@ object MacroUtils:
     println(Printer.TreeShortCode.show(any.asTerm))
     any
   }  
+
+  inline def showType[T, R](inline any: R): R = ${ printType[T, R]('any) }
+  def printType[T: Type, R](any: Expr[R])(using quotes: Quotes, tpe: Type[T]): Expr[R] = {
+    println(s"Got type: ${tpe}")
+    any
+  }
 
 end MacroUtils
