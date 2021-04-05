@@ -7,6 +7,8 @@ import experimental.chimneylike.internal.derived.TransformerDerive
 import experimental.chimneylike.Transformer
 import experimental.chimneylike.internal.utils.MacroUtils
 
+import scala.compiletime.error
+
 /** Allows customization of [[experimental.chimneylike.Transformer]] derivation
   *
   * @tparam From type of input value

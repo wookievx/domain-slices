@@ -14,16 +14,21 @@ object TransformerDerive:
   import TransformerCfg.*
 
   inline def derived[From, To, Config <: Tuple, Flags <: Tuple](config: TransformerDefinition[From, To, Config, Flags]): Transformer[From, To] =
+    deriveConfigured[From, To](configOf(config))
+
+  inline def derived[F[_], From, To, Config <: Tuple, Flags <: Tuple](config: TransformerFDefinition[F, From, To, Config, Flags])(using sup: TransformerFSupport[F]): TransformerF[F, From, To] =
+    deriveConfiguredF[F, From, To](configOf(config))
+ 
+  inline def deriveConfigured[From, To](inline config: ClassProductConfig[_, _]): Transformer[From, To] =
     summonFrom {
-      case tm: Mirror.ProductOf[To] =>
+      case fm: Mirror.ProductOf[From] =>
         summonFrom {
-          case fm: Mirror.ProductOf[From] =>
+          case tm: Mirror.ProductOf[To] =>
             new Transformer[From, To]:
               def transform(from: From): To =
                 val input = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
                 val output = new Array[Any](constValue[Tuple.Size[tm.MirroredElemTypes]])
-                val genConfig = configOf(config)
-                DeriveProduct.handleTargetImpl[From, To, tm.MirroredElemTypes, tm.MirroredElemLabels, 0](genConfig, fm)(output.asInstanceOf, input.asInstanceOf, from)
+                DeriveProduct.handleTargetImpl[From, To, tm.MirroredElemTypes, tm.MirroredElemLabels, 0](config, fm)(output.asInstanceOf, input.asInstanceOf, from)
                 tm.fromProduct(Tuple.fromArray(output))
           case _ =>
             error("Automatic derivation not supported (yet) for supplied types")
@@ -31,27 +36,29 @@ object TransformerDerive:
       case _ =>
         error("Automatic derivation not supported (yet) for supplied types")
     }
-  end derived
 
-  inline def derived[F[_], From, To, Config <: Tuple, Flags <: Tuple](config: TransformerFDefinition[F, From, To, Config, Flags])(using sup: TransformerFSupport[F]): TransformerF[F, From, To] =
+  end deriveConfigured
+
+  inline def deriveConfiguredF[F[_], From, To](inline
+   config: ClassProductConfig[_, _]
+  )(using sup: TransformerFSupport[F]): TransformerF[F, From, To] = 
     summonFrom {
-      case tm: Mirror.ProductOf[To] =>
+      case fm: Mirror.ProductOf[From] =>
         summonFrom {
-          case fm: Mirror.ProductOf[From] =>
+          case tm: Mirror.ProductOf[To] =>
             new TransformerF[F, From, To]:
               def transform(from: From): F[To] =
                 val input = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
                 val output = sup.pure(new Array[Any](constValue[Tuple.Size[tm.MirroredElemTypes]]))
-                val genConfig = configOf(config)
-                val finalOutput = DeriveProduct.handleTargetWithFImpl[F, From, To, tm.MirroredElemTypes, tm.MirroredElemLabels, 0](genConfig, fm)(output.asInstanceOf, input.asInstanceOf, from)
-                sup.map(finalOutput, output => tm.fromProduct(Tuple.fromArray(output)))
+                DeriveProduct.handleTargetWithFImpl[F, From, To, tm.MirroredElemTypes, tm.MirroredElemLabels, 0](config, fm)(output.asInstanceOf, input.asInstanceOf, from)
+                sup.map(output, output => tm.fromProduct(Tuple.fromArray(output)))
           case _ =>
             error("Automatic derivation not supported (yet) for supplied types")
         }
       case _ =>
         error("Automatic derivation not supported (yet) for supplied types")
     }
-  end derived
+
 end TransformerDerive
 
 object DeriveProduct:
@@ -175,7 +182,12 @@ object DeriveProduct:
           case _: (Field *: _, Tpe *: _) =>
             outputArray(targetPosition) = inputArray(constValue[Pos])
           case _: (Field *: _, tpe *: _) =>
-            error("More advanced cases are not handled for now")
+            summonFrom {
+              case transformer: Transformer[tpe, Tpe] =>
+                outputArray(targetPosition) = transformer.transform(inputArray(constValue[Pos]).asInstanceOf)
+              case _ =>
+                outputArray(targetPosition) = TransformerDerive.deriveConfigured[tpe, Tpe](config)
+            }
           case _: (_ *: sourceFields, _ *: sourceTypes) =>
             findInSource[From, To, Field, sourceFields, Tpe, sourceTypes, Pos + 1](config)(outputArray, inputArray, targetPosition)
           case _: (EmptyTuple, _) =>
@@ -187,6 +199,32 @@ object DeriveProduct:
             else
               error("Failed to locate a field in source class")
   end findInSource
+
+  inline def findInSourceWithF[F[_], From, To, Field, SourceFields <: Tuple, Tpe, SourceTypes <: Tuple, Pos <: Int](
+    inline config: ClassProductConfig[_, _]
+  )(
+    outputArray: Array[Any], 
+    inputArray: IArray[Any], 
+    targetPosition: Int
+  )(using sup: TransformerFSupport[F]): Unit = 
+    inline config match
+      case c: ClassProductConfig[_, flags] =>
+        inline (erasedValue[SourceFields], erasedValue[SourceTypes]) match
+          case _: (Field *: _, Tpe *: _) =>
+            outputArray(targetPosition) = inputArray(constValue[Pos])
+          case _: (Field *: _, tpe *: _) =>
+            error("More advanced cases are not handled for now")
+          case _: (_ *: sourceFields, _ *: sourceTypes) =>
+            findInSource[From, To, Field, sourceFields, Tpe, sourceTypes, Pos + 1](config)(outputArray, inputArray, targetPosition)
+          case _: (EmptyTuple, _) =>
+            inline if constValue[HasAFlag[flags, TransformerFlag.DefaultValues]] then
+              inline if MacroUtils.defaultValueExistsIn[To](constValue[Field]) then
+                outputArray(targetPosition) = config.defaults(constValue[Field].asInstanceOf)
+              else 
+                error("Unable to find default value in target when its missing from source")
+            else
+              error("Failed to locate a field in source class")
+  end findInSourceWithF
 
   
 end DeriveProduct
