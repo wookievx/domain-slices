@@ -119,3 +119,5 @@ final class TransformerDefinition[From, To, Config <: Tuple, Flags <: Tuple](
 }
 
 def defaultDefinition[From, To]: TransformerDefinition[From, To, EmptyTuple, EmptyTuple] = TransformerDefinition(Map.empty, Map.empty)
+
+def defaultDefinitionWithFlags[From, To, Flags <: Tuple]: TransformerDefinition[From, To, EmptyTuple, Flags] = TransformerDefinition(Map.empty, Map.empty)

@@ -90,10 +90,21 @@ object MacroUtils:
     any
   }  
 
-  inline def showType[T, R](inline any: R): R = ${ printType[T, R]('any) }
-  def printType[T: Type, R](any: Expr[R])(using quotes: Quotes, tpe: Type[T]): Expr[R] = {
+  inline def showType[T]: Unit = ${ printType[T] }
+  def printType[T: Type](using quotes: Quotes, tpe: Type[T]): Expr[Unit] = {
     println(s"Got type: ${tpe}")
-    any
+    '{}
+  }
+
+  inline def reportErrorAtPath[P <: String](inline path: P, inline constantPart: String) = ${ reportErrorAtPathImpl('path, 'constantPart) }
+
+  def reportErrorAtPathImpl[P <: String](path: Expr[P], constantPart: Expr[String])(using q: Quotes): Expr[Nothing] = {
+    import q.reflect.report
+    (path.value, constantPart.value) match
+      case (Some(path), Some(v)) => 
+        report.throwError(s"$v at $path")
+      case _ =>
+        report.throwError("Unable to produce nice error, bug in library")
   }
 
 end MacroUtils

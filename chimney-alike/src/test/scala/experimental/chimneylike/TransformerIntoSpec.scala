@@ -4,6 +4,7 @@ import dsl.*
 import internal.utils.MacroUtils
 import internal.*
 import utest.*
+import examples.*
 
 object TransformerIntoSpec extends TestSuite:
   val tests = Tests {
@@ -64,6 +65,34 @@ object TransformerIntoSpec extends TestSuite:
 
         }
 
+        "builds correct transformation recursively" - {
+          val book = Book(
+            "Average book", 
+            List(
+              Chapter("Nice chapter", 1, List("Lorem ipsum")),
+              Chapter("Bad chapter", 2, List("The answer", "42"))
+            )
+          )
+
+          val expectedReview = ReviewedBook(
+            "Average book",
+            List(
+              ChapterReview("Nice chapter", 1, "Lorem ipsum"),
+              ChapterReview("Bad chapter", 2, "Lorem ipsum")
+            ),
+            "I liked it"
+          )
+
+          given transformer: Transformer[Book, ReviewedBook] =
+            defaultDefinition[Book, ReviewedBook]
+              .enableDefaultValues
+              .withFieldConst(_.review, "I liked it")
+              .buildTransformer
+
+          book.transformTo ==> expectedReview
+          
+        }
+
       }
 
       "TransformerFDefinition" - {
@@ -98,4 +127,5 @@ object TransformerIntoSpec extends TestSuite:
 
   case class Source(a: Int, b: String, d: Long, e: Double)
   case class Target(a: Int, b: String, d: Long, e: Double = 4.4, s: Source, z: Boolean = false)
+
 end TransformerIntoSpec
