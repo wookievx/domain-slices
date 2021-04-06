@@ -12,29 +12,26 @@ object TransformerCfg:
   final class FieldRelabelled[FromName <: String, ToName <: String] extends TransformerCfg
   final class CoproductInstance[InstType, TargetType] extends TransformerCfg
   final class CoproductInstanceF[InstType, TargetType] extends TransformerCfg
-  final class WrapperType[F[+_], C <: TransformerCfg] extends TransformerCfg
+  final class WrapperType[F[_]] extends TransformerCfg
 end TransformerCfg
 
 type EnableConfig[Config <: Tuple, Cfg <: TransformerCfg] = Cfg *: DisableConfig[Config, Cfg]
 
 import TransformerCfg.*
 
-type DisableConfig[Config <: Tuple, Cfg <: TransformerCfg] <: Tuple = (Config, Cfg) match
-  case (FieldConst[a] *: tail, FieldConst[b]) => 
-    (a != b) match
-      case true => FieldConst[a] *: DisableConfig[tail, Cfg]
-      case false => tail
-  case (FieldConstF[a] *: tail, FieldConstF[b]) => 
-    (a != b) match
-      case true => FieldConstF[a] *: DisableConfig[tail, Cfg]
-      case false => tail
-  case (FieldComputedF[a] *: tail, FieldComputedF[b]) => 
-    (a != b) match
-      case true => FieldComputedF[a] *: DisableConfig[tail, Cfg]
-      case false => tail
-  case (FieldRelabelled[a1, a2] *: tail, FieldRelabelled[b1, b2]) => 
-    (a1 != b1 ) || (a2 != b2) match
-      case true => FieldRelabelled[a1, a2] *: DisableConfig[tail, Cfg]
-      case false => tail
-  case (h *: tail, _) => h *: DisableConfig[tail, Cfg]
-  case (EmptyTuple, _) => EmptyTuple
+type DisableConfig[Config <: Tuple, Cfg <: TransformerCfg] <: Tuple = Cfg match
+  case FieldConst[name] => DisableField[Config, name]
+  case FieldConstF[name] => DisableField[Config, name]
+  case FieldComputed[name] => DisableField[Config, name]
+  case FieldComputedF[name] => DisableField[Config, name]
+  case FieldRelabelled[_, name] => DisableField[Config, name]
+  case _ => Config
+
+type DisableField[Config <: Tuple, Name <: String] <: Tuple = Config match
+  case FieldConst[Name] *: tail => tail
+  case FieldConstF[Name] *: tail => tail 
+  case FieldComputed[Name] *: tail => tail
+  case FieldComputedF[Name] *: tail => tail
+  case FieldRelabelled[_, Name] *: tail => tail
+  case h *: tail => h *: DisableField[tail, Name]
+  case EmptyTuple => EmptyTuple

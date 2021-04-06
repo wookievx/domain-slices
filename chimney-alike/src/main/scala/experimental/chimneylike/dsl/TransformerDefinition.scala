@@ -1,10 +1,13 @@
 package experimental.chimneylike.dsl
 
 import experimental.chimneylike.internal.TransformerFlag.*
-import experimental.chimneylike.internal.dsl.TransformerDefinitionBuilder
+import experimental.chimneylike.internal.dsl.*
 import experimental.chimneylike.internal.*
+import experimental.chimneylike.internal.derived.TransformerDerive
 import experimental.chimneylike.Transformer
 import experimental.chimneylike.internal.utils.MacroUtils
+
+import scala.compiletime.error
 
 /** Allows customization of [[experimental.chimneylike.Transformer]] derivation
   *
@@ -17,6 +20,17 @@ final class TransformerDefinition[From, To, Config <: Tuple, Flags <: Tuple](
     val instances: Map[(String, String), Any]
 ) extends FlagsDsl[[FS <: Tuple] =>> TransformerDefinition[From, To, Config, FS], Flags] {
 
+  /** Lifts current transformer definition with provided type constructor `F`.
+    *
+    * It keeps all the configuration, provided missing values, renames,
+    * coproduct instances etc.
+    *
+    * @tparam F    wrapper type constructor
+    * @return [[io.scalaland.chimney.dsl.TransformerFDefinition]]
+    */
+  inline def lift[F[_]]: TransformerFDefinition[F, From, To, EnableConfig[Config, TransformerCfg.WrapperType[F]], Flags] =
+    TransformerFDefinition[F, From, To, EnableConfig[Config, TransformerCfg.WrapperType[F]], Flags](overrides, instances)
+
   /** Use `value` provided here for field picked using `selector`.
     *
     * By default if `From` is missing field picked by `selector` compilation fails.
@@ -26,7 +40,20 @@ final class TransformerDefinition[From, To, Config <: Tuple, Flags <: Tuple](
     * @param value    constant value to use for the target field
     * @return [[experimental.chimneylike.dsl.TransformerDefinition]]
     */
-  transparent inline def withFieldConst[T](inline selector: To => T, value: T) = TransformerDefinitionBuilder.withFieldConst[From, To, Config, Flags, T](this)(selector, value)
+  transparent inline def withFieldConst[T](inline selector: To => T, value: T) = 
+    TransformerDefinitionBuilder.withFieldConst[From, To, Config, Flags, T](this)(selector, value)
+
+  /** Use wrapped `value` provided here for field picked using `selector`.
+    *
+    * By default if `From` is missing field picked by `selector` compilation fails.
+    *
+    * @see [[https://scalalandio.github.io/chimney/transformers/customizing-transformers.html#providing-missing-values]] for more details
+    * @param selector target field in `To`, defined like `_.name`
+    * @param value    constant value to use for the target field
+    * @return [[io.scalaland.chimney.dsl.TransformerFDefinition]]
+    */
+  transparent inline def withFieldConstF[F[_], T](inline selector: To => T, value: F[T]) = 
+    lift[F].withFieldConstF[T](selector, value)
 
   /** Use `map` provided here to compute value of field picked using `selector`.
     *
@@ -37,10 +64,20 @@ final class TransformerDefinition[From, To, Config <: Tuple, Flags <: Tuple](
     * @param map      function used to compute value of the target field
     * @return [[experimental.chimneylike.dsl.TransformerDefinition]]
     */
-  transparent inline def withFieldComputed[T](
-      selector: To => T,
-      map: From => T
-  ) = ???
+  transparent inline def withFieldComputed[T](inline selector: To => T, map: From => T) = 
+    TransformerDefinitionBuilder.withFieldComputed(this)(selector, map)
+  
+  /** Use `map` provided here to compute value of field picked using `selector`.
+    *
+    * By default if `From` is missing field picked by `selector` compilation fails.
+    *
+    * @see [[https://scalalandio.github.io/chimney/transformers/customizing-transformers.html#providing-missing-values]] for more details
+    * @param selector target field in `To`, defined like `_.name`
+    * @param map      function used to compute value of the target field
+    * @return [[experimental.chimneylike.dsl.TransformerFDefinition]]
+    */
+  transparent inline def withFieldComputedF[F[_], T](inline selector: To => T, map: From => F[T]) = 
+    lift[F].withFieldComputedF(selector, map)
 
   /** Use `selectorFrom` field in `From` to obtain the value of `selectorTo` field in `To`
     *
@@ -76,8 +113,11 @@ final class TransformerDefinition[From, To, Config <: Tuple, Flags <: Tuple](
     *
     * @return [[experimental.chimneylike.Transformer]] type class instance
     */
-  inline def buildTransformer[ScopeFlags <: Tuple](using tc: TransformerConfiguration[ScopeFlags]): Transformer[From, To] = ???
+  inline def buildTransformer: Transformer[From, To] = 
+    TransformerDerive.derived[From, To, Config, Flags](this)
 
 }
 
 def defaultDefinition[From, To]: TransformerDefinition[From, To, EmptyTuple, EmptyTuple] = TransformerDefinition(Map.empty, Map.empty)
+
+def defaultDefinitionWithFlags[From, To, Flags <: Tuple]: TransformerDefinition[From, To, EmptyTuple, Flags] = TransformerDefinition(Map.empty, Map.empty)

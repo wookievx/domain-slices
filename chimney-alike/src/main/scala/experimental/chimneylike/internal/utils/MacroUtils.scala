@@ -32,9 +32,9 @@ object MacroUtils:
     }
   end getDefaultParmasImpl
 
-  inline def nameExistsIn[T](inline name: String): Boolean = ${ nameExistsInImpl[T]('name) }
+  inline def defaultValueExistsIn[T](inline name: Any): Boolean = ${ nameExistsInImpl[T]('name) }
 
-  def nameExistsInImpl[T: Type](name: Expr[String])(using Quotes): Expr[Boolean] =
+  def nameExistsInImpl[T: Type](name: Expr[Any])(using Quotes): Expr[Boolean] =
     import quotes.reflect.*
     val sym = TypeTree.of[T].symbol
 
@@ -44,15 +44,22 @@ object MacroUtils:
         for p <- sym.caseFields if p.flags.is(Flags.HasDefault)
         yield p.name
 
-      name.value match
-        case Some(name) => Expr(names.contains(name))
-        case None => report.throwError("Failed to check if name exist, probably a bug in library")
+      println(s"Checking out: ${name.show}")
+
+      name match 
+        case '{$n: String} =>
+          n.value match
+            case Some(name) =>
+              Expr(names.contains(name))
+            case _ => report.throwError("Failed to check if name exist, probably a bug in library") 
+        case _ =>
+          report.throwError("Failed to check if name exist, probably a bug in library")
     } else {
       Expr(false)
     }
   end nameExistsInImpl
 
-  inline def extracNameFromSelector[To, T](inline code: To => T): String = ${extractNameFromSelectorImpl('code)}
+  transparent inline def extracNameFromSelector[To, T](inline code: To => T) = ${extractNameFromSelectorImpl('code)}
 
   def extractNameFromSelectorImpl[To: Type, T: Type](code: Expr[To => T])(using Quotes): Expr[String] = 
     import quotes.reflect.*
@@ -82,5 +89,22 @@ object MacroUtils:
     println(Printer.TreeShortCode.show(any.asTerm))
     any
   }  
+
+  inline def showType[T]: Unit = ${ printType[T] }
+  def printType[T: Type](using quotes: Quotes, tpe: Type[T]): Expr[Unit] = {
+    println(s"Got type: ${tpe}")
+    '{}
+  }
+
+  inline def reportErrorAtPath[P <: String](inline path: P, inline constantPart: String) = ${ reportErrorAtPathImpl('path, 'constantPart) }
+
+  def reportErrorAtPathImpl[P <: String](path: Expr[P], constantPart: Expr[String])(using q: Quotes): Expr[Nothing] = {
+    import q.reflect.report
+    (path.value, constantPart.value) match
+      case (Some(path), Some(v)) => 
+        report.throwError(s"$v at $path")
+      case _ =>
+        report.throwError("Unable to produce nice error, bug in library")
+  }
 
 end MacroUtils

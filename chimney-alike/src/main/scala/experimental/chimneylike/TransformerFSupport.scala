@@ -2,7 +2,7 @@ package experimental.chimneylike
 
 import scala.collection.Factory
 
-trait TransformerFSupport[F[+_]]:
+trait TransformerFSupport[F[_]]:
 
   /** Wrap a value into the type constructor `F`.
     *
@@ -52,6 +52,29 @@ trait TransformerFSupport[F[+_]]:
     * @tparam B  target element type of function `f`
     * @return wrapped collection of type `F[M]`
     */
-  def traverse[M, A, B](it: Iterator[A], f: A => F[B])(using fac: Factory[B, M]): F[M]
+  def traverse[M, A, B](it: Iterator[A], f: A => F[B])(using fac: Factory[B, M]): F[M] 
+
+end TransformerFSupport
+
+object TransformerFSupport:
+  given TransformerFSupport[Option] with
+    def pure[A](value: A): Option[A] = Some(value)
+    def product[A, B](fa: Option[A], fb: => Option[B]): Option[(A, B)] =
+      for
+        a <- fa
+        b <- fb
+      yield (a, b)
+    def map[A, B](fa: Option[A], f: A => B): Option[B] = fa.map(f)
+
+    def traverse[M, A, B](it: Iterator[A], f: A => Option[B])(using fac: Factory[B, M]): Option[M] =
+      val b = fac.newBuilder
+      var wasNone = false
+      while !wasNone && it.hasNext do
+        f(it.next()) match 
+          case None     => wasNone = true
+          case Some(fb) => b += fb
+      
+      if (wasNone) None else Some(b.result())
+    end traverse
 
 end TransformerFSupport
