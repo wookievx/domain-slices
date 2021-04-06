@@ -122,6 +122,34 @@ object TransformerIntoSpec extends TestSuite:
 
         }
 
+        "builds correct transformation recursively" - {
+          val book = Book(
+            "Average book", 
+            List(
+              Chapter("Nice chapter", 1, List("Lorem ipsum")),
+              Chapter("Bad chapter", 2, List("The answer", "42"))
+            )
+          )
+
+          val expectedReview = ReviewedBook(
+            "Average book",
+            List(
+              ChapterReview("Nice chapter", 1, "Lorem ipsum"),
+              ChapterReview("Bad chapter", 2, "Lorem ipsum")
+            ),
+            "I liked it very much"
+          )
+
+          given transformer: TransformerF[Option, Book, ReviewedBook] =
+            defaultDefinition[Book, ReviewedBook]
+              .enableDefaultValues
+              .withFieldConstF(_.review, Option("I liked it very much"))
+              .buildTransformer
+
+          book.transformTo ==> Some(expectedReview)
+          
+        }
+
       }
   }
 
