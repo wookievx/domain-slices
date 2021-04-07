@@ -100,11 +100,11 @@ object TransformerIntoSpec extends TestSuite:
 
           val book: LibraryObject = LibraryObject.Book("Nice book", List(Chapter("The beginning", 1, List("Lorem ipsum..."))))
           val newspaper: LibraryObject = LibraryObject.Newspaper("Nice newspaper", List("Lorem ipsum..."))
-          val movie: LibraryObject = LibraryObject.Movie("Nice movie", Array.empty)
+          val movie: LibraryObject = LibraryObject.Movie("Nice movie", Vector(1, 2, 3, 4))
 
-          val indexedBook: IndexedObject = IndexedObject.Book("Nice book", List(IndexedChapter("The beginning", 1, List("Lorem ipsum..."), 101)), 1)
-          val indexedNewspaper: IndexedObject = IndexedObject.Newspaper("Nice newspaper", List("Lorem ipsum..."), 2)
-          val indexedMovie: IndexedObject = IndexedObject.Movie("Nice movie", Array.empty, 3)
+          val indexedBook: IndexedObject = IndexedObject.Book("Nice book", List(IndexedChapter("The beginning", 1, List("Lorem ipsum..."))))
+          val indexedNewspaper: IndexedObject = IndexedObject.Newspaper("Nice newspaper", List("Lorem ipsum..."))
+          val indexedMovie: IndexedObject = IndexedObject.Movie("Nice movie", Vector(1, 2, 3, 4))
 
           given transformerFromIndex: Transformer[IndexedObject, LibraryObject] =
             defaultDefinition[IndexedObject, LibraryObject].buildTransformer

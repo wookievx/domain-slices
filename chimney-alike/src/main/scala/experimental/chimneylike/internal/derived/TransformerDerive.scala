@@ -219,9 +219,9 @@ object DeriveProduct:
               inline if MacroUtils.defaultValueExistsIn[To](constValue[Field]) then
                 outputArray(targetPosition) = config.defaults(constValue[Field].asInstanceOf)
               else 
-                error("Unable to find default value in target when its missing from source")
+                error(constValue["Unable to find default value in target when its missing from source, when deriving at: " Concat path])
             else
-              error("Failed to locate a field in source class")
+              error(constValue["Failed to locate a field in source class, when deriving at" Concat path])
   end findInSource
 
   inline def findInSourceWithF[F[_], From, To, Field, SourceFields <: Tuple, Tpe, SourceTypes <: Tuple, Pos <: Int](
@@ -285,9 +285,9 @@ object DeriveProduct:
               inline if MacroUtils.defaultValueExistsIn[To](constValue[Field]) then
                 sup.map(outputArray, outputArray => outputArray(targetPosition) = config.defaults(constValue[Field].asInstanceOf))
               else 
-                error("Unable to find default value in target when its missing from source")
+                error(constValue["Unable to find default value in target when its missing from source, when deriving at: " Concat path])
             else
-              error("Failed to locate a field in source class")
+              error(constValue["Failed to locate a field in source class, when deriving at" Concat path])
   end findInSourceWithF
 
   
