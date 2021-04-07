@@ -120,6 +120,8 @@ object DeriveProduct:
           case _: FieldComputed[_] => 
             val f = config.overrides(constValue[Name].asInstanceOf).asInstanceOf[From => Any]
             outputArray(constValue[At]) = f(input)
+          case _: FieldRelabelled[fieldFrom, Name] =>
+            extractFromSource[At, fieldFrom, T, From, To, flags](config, fm)(outputArray, inputArray)
           case _ => 
             extractFromSource[At, Name, T, From, To, flags](config, fm)(outputArray, inputArray)
   end handleTargetField       
@@ -160,6 +162,11 @@ object DeriveProduct:
                 outputArray(constValue[At]) = value
                 outputArray
               }  
+            )
+          case _: FieldRelabelled[fieldFrom, Name] =>
+            sup.map(outputArray, outputArray =>
+              extractFromSource[At, fieldFrom, T, From, To, flags](config, fm)(outputArray, inputArray)
+              outputArray
             )
           case _ => 
             sup.map(outputArray, outputArray =>
@@ -314,6 +321,7 @@ object DeriveUtils:
     case FieldConstF[Field] *: _ => FieldConstF[Field]
     case FieldComputed[Field] *: _ => FieldComputed[Field]
     case FieldComputedF[Field] *: _ => FieldComputedF[Field]
+    case FieldRelabelled[fromField, Field] *: _ => FieldRelabelled[fromField, Field]
     case _ *: tail => ConfigOf[tail, Field]
     case EmptyTuple => TransformerCfg
 

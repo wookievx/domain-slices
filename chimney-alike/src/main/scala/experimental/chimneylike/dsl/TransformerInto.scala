@@ -66,6 +66,18 @@ final class TransformerInto[From, To, Config <: Tuple, Flags <: Tuple](
   transparent inline def withFieldComputedF[F[_], T](inline selector: To => T, map: From => F[T]) = 
     withDefinitionF[F](definition.withFieldComputedF(selector, map))
 
+  /** Use `selectorFrom` field in `From` to obtain the value of `selectorTo` field in `To`
+    *
+    * By default if `From` is missing field picked by `selectorTo` compilation fails.
+    *
+    * @see [[https://scalalandio.github.io/chimney/transformers/customizing-transformers.html#fields-renaming]] for more details
+    * @param selectorFrom source field in `From`, defined like `_.originalName`
+    * @param selectorTo   target field in `To`, defined like `_.newName`
+    * @return [[experimental.chimneylike.dsl.TransformerInto]]
+    */
+  transparent inline def withFieldRenamed[T](inline selectorFrom: From => T, inline selectorTo: To => T) = 
+    withDefinition(definition.withFieldRenamed(selectorFrom, selectorTo))
+
   transparent inline def withDefinition(inline newDefinition: Any) =
     inline newDefinition match
       case definition: TransformerDefinition[From, To, config, flags] =>

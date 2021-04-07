@@ -24,6 +24,14 @@ object TransformerDefinitionBuilder:
     compute: From => T
   ) = ${ withFieldComputedImpl('definition)('selector, 'compute) }
 
+  transparent inline def withFieldRelabelled[From, To, Config <: Tuple, Flags <: Tuple, T](
+    definition: TransformerDefinition[From, To, Config, Flags]
+  )(inline 
+    renameFrom: From => T, 
+    inline
+    renameTo: To => T
+  ) = ${ withFieldRelabelledImpl('definition)('renameFrom, 'renameTo) }
+
   def withFieldConstImpl[From: Type, To: Type, Config <: Tuple: Type, Flags <: Tuple: Type, T: Type](
     definition: Expr[TransformerDefinition[From, To, Config, Flags]]
   )(
@@ -53,6 +61,20 @@ object TransformerDefinitionBuilder:
       compute
     )
   }
+
+  def withFieldRelabelledImpl[From: Type, To: Type, Config <: Tuple: Type, Flags <: Tuple: Type, T: Type](
+    definition: Expr[TransformerDefinition[From, To, Config, Flags]]
+  )(
+    renameFrom: Expr[From => T], 
+    renameTo: Expr[To => T]
+  )(using Quotes): Expr[Any] =
+    GenericTransformerDefinitionBuilder.withFieldRenamedImpl[[Config <: Tuple] =>> TransformerDefinition[From, To, Config, Flags], From, To, Config, Flags, T](
+      definition,
+      new TransformerDefinitionBuilder[From, To, Flags] 
+    )(
+      renameFrom,
+      renameTo
+    )
 
 end TransformerDefinitionBuilder
 
@@ -86,6 +108,14 @@ object TransformerFDefinitionBuilder:
     selector: To => T, 
     compute: From => F[T]
   ) = ${ withFieldComputedFImpl('definition)('selector, 'compute) }
+
+  transparent inline def withFieldRelabelled[F[_], From, To, Config <: Tuple, Flags <: Tuple, T](
+    definition: TransformerFDefinition[F, From, To, Config, Flags]
+  )(inline 
+    renameFrom: From => T, 
+    inline
+    renameTo: To => T
+  ) = ${ withFieldRelabelledImpl('definition)('renameFrom, 'renameTo) }
 
   def withFieldConstImpl[F[_]: Type, From: Type, To: Type, Config <: Tuple: Type, Flags <: Tuple: Type, T: Type](
     definition: Expr[TransformerFDefinition[F, From, To, Config, Flags]]
@@ -147,6 +177,20 @@ object TransformerFDefinitionBuilder:
     )
   }
 
+  def withFieldRelabelledImpl[F[_]: Type, From: Type, To: Type, Config <: Tuple: Type, Flags <: Tuple: Type, T: Type](
+    definition: Expr[TransformerFDefinition[F, From, To, Config, Flags]]
+  )(
+    renameFrom: Expr[From => T], 
+    renameTo: Expr[To => T]
+  )(using Quotes): Expr[Any] =
+    GenericTransformerDefinitionBuilder.withFieldRenamedImpl[[Config <: Tuple] =>> TransformerFDefinition[F, From, To, Config, Flags], From, To, Config, Flags, T](
+      definition,
+      new TransformerFDefinitionBuilder[F, From, To, Flags] 
+    )(
+      renameFrom,
+      renameTo
+    )
+
 end TransformerFDefinitionBuilder
 
 object GenericTransformerDefinitionBuilder:
@@ -207,6 +251,19 @@ object GenericTransformerDefinitionBuilder:
           builder.withField[Config, EnableConfig[Config, TransformerCfg.FieldComputedF[T]]](definition, nameExpr, compute)
     )(selector)
 
+  def withFieldRenamedImpl[Definition[_ <: Tuple], From: Type, To: Type, Config <: Tuple: Type, Flags <: Tuple: Type, T: Type](
+    definition: Expr[Definition[Config]],
+    builder: FinalDefinitionBuilder[Definition]
+  )(
+    renameFrom: Expr[From => T],
+    renameTo: Expr[To => T]
+  )(using Quotes): Expr[Any] =
+    withFieldGenImpl[From, To, T](
+      new ExprModifierRename:
+        def apply[F <: String: Type, T <: String: Type](renameFrom: Expr[F], renameTo: Expr[T]): Expr[Any] =
+          builder.withNewConfig[Config, EnableConfig[Config, TransformerCfg.FieldRelabelled[F, T]]](definition)
+    )(renameFrom, renameTo)
+
   private def withFieldGenImpl[To: Type, T: Type](
     concrete: ExprModifier
   )(
@@ -221,12 +278,33 @@ object GenericTransformerDefinitionBuilder:
           report.throwError("Unable to extract selector name")
   end withFieldGenImpl
 
+  private def withFieldGenImpl[From: Type, To: Type, T: Type](
+    concrete: ExprModifierRename
+  )(
+    renameFrom: Expr[From => T],
+    renameTo: Expr[To => T]
+  )(using quotes: Quotes): Expr[Any] = 
+    import quotes.reflect.report
+    val renameFromExpr = MacroUtils.extractNameFromSelectorImpl(renameFrom)
+    val renameToExpr = MacroUtils.extractNameFromSelectorImpl(renameTo)
+    (renameFromExpr, renameToExpr) match
+      case ('{$renameFrom: f}, '{$renameTo: t}) =>
+          concrete(renameFrom, renameTo)
+      case _ =>
+          report.throwError("Unable to extract selectors names")
+  end withFieldGenImpl
+
   trait ExprModifier {
     def apply[T <: String: Type](nameExpr: Expr[T]): Expr[Any]
   }
 
+  trait ExprModifierRename {
+    def apply[F <: String: Type, T <: String: Type](renameFrom: Expr[F], renameTo: Expr[T]): Expr[Any]
+  }
+
   trait FinalDefinitionBuilder[Definition[_ <: Tuple]] {
     def withField[OldConfig <: Tuple: Type, NewConfig <: Tuple: Type](old: Expr[Definition[OldConfig]], name: Expr[String], value: Expr[Any]): Expr[Definition[NewConfig]]
+    def withNewConfig[OldConfig <: Tuple: Type, NewConfig <: Tuple: Type](old: Expr[Definition[OldConfig]]): Expr[Definition[NewConfig]]
   }
 
   class TransformerDefinitionBuilder[From: Type, To: Type, Flags <: Tuple: Type](using Quotes) extends 
@@ -237,6 +315,10 @@ object GenericTransformerDefinitionBuilder:
         instances = $old.instances
       )
     }
+
+    def withNewConfig[OldConfig <: Tuple: Type, NewConfig <: Tuple: Type](old: Expr[TransformerDefinition[From, To, OldConfig, Flags]]): Expr[TransformerDefinition[From, To, NewConfig, Flags]] = '{
+      $old.asInstanceOf[TransformerDefinition[From, To, NewConfig, Flags]]
+    }
   
   class TransformerFDefinitionBuilder[F[_]: Type, From: Type, To: Type, Flags <: Tuple: Type](using Quotes) extends 
     FinalDefinitionBuilder[[Config <: Tuple] =>> TransformerFDefinition[F, From, To, Config, Flags]]:
@@ -245,6 +327,10 @@ object GenericTransformerDefinitionBuilder:
         overrides = $old.overrides + ($name -> $value),
         instances = $old.instances
       )
+    }
+
+    def withNewConfig[OldConfig <: Tuple: Type, NewConfig <: Tuple: Type](old: Expr[TransformerFDefinition[F, From, To, OldConfig, Flags]]): Expr[TransformerFDefinition[F, From, To, NewConfig, Flags]] = '{
+      $old.asInstanceOf[TransformerFDefinition[F, From, To, NewConfig, Flags]]
     }
   
 end GenericTransformerDefinitionBuilder

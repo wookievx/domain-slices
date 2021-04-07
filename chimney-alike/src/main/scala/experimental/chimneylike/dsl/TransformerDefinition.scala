@@ -88,10 +88,8 @@ final class TransformerDefinition[From, To, Config <: Tuple, Flags <: Tuple](
     * @param selectorTo   target field in `To`, defined like `_.newName`
     * @return [[experimental.chimneylike.dsl.TransformerDefinition]]
     */
-  transparent inline def withFieldRenamed[T](
-      selectorFrom: From => T,
-      selectorTo: To => T
-  ) = ???
+  transparent inline def withFieldRenamed[T](inline selectorFrom: From => T, inline selectorTo: To => T) = 
+    TransformerDefinitionBuilder.withFieldRelabelled(this)(selectorFrom, selectorTo)
 
   /** Use `f` to calculate the (missing) coproduct instance when mapping one coproduct into another.
     *

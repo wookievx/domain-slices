@@ -12,9 +12,9 @@ object TransformerIntoSpec extends TestSuite:
         import TransformerCfg.*
         import TransformerFlag.*
         "builds correctly typed definition" - {
-          val source = Source(a = 100, b = "100", d = 42L, e = 6.6)
+          val source = Source(a = 100, b = "100", c = "9000", d = 42L, e = 6.6)
 
-          type ExpectedConfig = (FieldComputedF["s"], FieldComputed["e"], FieldConstF["d"], FieldConst["b"], WrapperType[Option])
+          type ExpectedConfig = (FieldRelabelled["b", "c"], FieldComputedF["s"], FieldComputed["e"], FieldConstF["d"], FieldConst["b"], WrapperType[Option])
           type ExpectedFlags = (MethodAccessors, OptionDefaultsToNone)
 
           val transformation: TransformerFInto[Option, Source, Target, ExpectedConfig, ExpectedFlags] =
@@ -25,6 +25,7 @@ object TransformerIntoSpec extends TestSuite:
               .withFieldConstF(_.d, Some(420L))
               .withFieldComputed(_.e, source => (source.a + source.d + source.e) / 3)
               .withFieldComputedF(_.s, source => Some(source.copy(a = 200)))
+              .withFieldRenamed(_.b, _.c)
               .enableOptionDefaultsToNone
               .enableMethodAccessors
           
@@ -44,19 +45,21 @@ object TransformerIntoSpec extends TestSuite:
 
         "builds correct transformer" - {
 
-          val source = Source(a = 100, b = "100", d = 42L, e = 6.6)
+          val source = Source(a = 100, b = "100", c = "9000", d = 42L, e = 6.6)
 
           val transformer: Transformer[Source, Target] =
             defaultDefinition[Source, Target]
               .withFieldConst(_.b, "200")
               .withFieldComputed(_.e, source => (source.a + source.d + source.e) / 3)
               .withFieldComputed(_.s, source => source.copy(a = 200))
+              .withFieldRenamed(_.b, _.c)
               .enableDefaultValues
               .buildTransformer
           
           transformer.transform(source) ==> Target(
             a = source.a, 
             b = "200", 
+            c = "100",
             d = source.d, 
             e = (source.a + source.d + source.e) / 3,
             s = source.copy(a = 200),
@@ -101,19 +104,21 @@ object TransformerIntoSpec extends TestSuite:
 
         "builds correct transformer" - {
 
-          val source = Source(a = 100, b = "100", d = 42L, e = 6.6)
+          val source = Source(a = 100, b = "100", c = "9000", d = 42L, e = 6.6)
 
           val transformer: TransformerF[Option, Source, Target] =
             defaultDefinition[Source, Target]
               .withFieldConstF(_.b, Option("200"))
               .withFieldComputed(_.e, source => (source.a + source.d + source.e) / 3)
               .withFieldComputed(_.s, source => source.copy(a = 200))
+              .withFieldRenamed(_.b, _.c)
               .enableDefaultValues
               .buildTransformer
           
           transformer.transform(source) ==> Some(Target(
             a = source.a, 
             b = "200", 
+            c = "100",
             d = source.d, 
             e = (source.a + source.d + source.e) / 3,
             s = source.copy(a = 200),
@@ -153,7 +158,7 @@ object TransformerIntoSpec extends TestSuite:
       }
   }
 
-  case class Source(a: Int, b: String, d: Long, e: Double)
-  case class Target(a: Int, b: String, d: Long, e: Double = 4.4, s: Source, z: Boolean = false)
+  case class Source(a: Int, b: String, c: String, d: Long, e: Double)
+  case class Target(a: Int, b: String, c: String, d: Long, e: Double = 4.4, s: Source, z: Boolean = false)
 
 end TransformerIntoSpec
