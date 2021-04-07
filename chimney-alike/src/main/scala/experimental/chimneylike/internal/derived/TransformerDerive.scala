@@ -19,7 +19,7 @@ object TransformerDerive:
   inline def derived[F[_], From, To, Config <: Tuple, Flags <: Tuple](config: TransformerFDefinition[F, From, To, Config, Flags])(using sup: TransformerFSupport[F]): TransformerF[F, From, To] =
     deriveConfiguredF[F, From, To, ""](configOf(config))
  
-  inline def deriveConfigured[From, To, P <: String](inline config: ClassProductConfig[_, _, P]): Transformer[From, To] =
+  inline def deriveConfigured[From, To, P <: String](inline config: TypeDeriveConfig[_, _, P]): Transformer[From, To] =
     MacroUtils.reportPointOfDerivation(constValue[P])
     summonFrom {
       case fm: Mirror.ProductOf[From] =>
@@ -34,6 +34,13 @@ object TransformerDerive:
           case _ =>
             MacroUtils.reportErrorAtPath[P](constValue[P], "Automatic derivation not supported (yet) for supplied types")
         }
+      case fm: Mirror.SumOf[From] =>
+        summonFrom {
+          case tm: Mirror.SumOf[To] =>
+            CoproductDerive.derived[From, To, P](config)(using fm, tm)
+          case _ =>
+            MacroUtils.reportErrorAtPath[P](constValue[P], "Automatic derivation not supported (yet) for supplied types")
+        }
       case _ =>
         MacroUtils.reportErrorAtPath[P](constValue[P], "Automatic derivation not supported (yet) for supplied types")
     }
@@ -41,7 +48,7 @@ object TransformerDerive:
   end deriveConfigured
 
   inline def deriveConfiguredF[F[_], From, To, P <: String](inline
-   config: ClassProductConfig[_, _, P]
+   config: TypeDeriveConfig[_, _, P]
   )(using sup: TransformerFSupport[F]): TransformerF[F, From, To] = 
     MacroUtils.reportPointOfDerivation(constValue[P])
     summonFrom {
@@ -69,7 +76,7 @@ object DeriveProduct:
   import TransformerCfg.*
 
   inline def handleTargetImpl[From, To, ToValues <: Tuple, TLabels <: Tuple, AtPos <: Int](
-    inline config: ClassProductConfig[_, _, _],
+    inline config: TypeDeriveConfig[_, _, _],
     fm: Mirror.ProductOf[From]
   )(
     outputArray: Array[Any],
@@ -84,7 +91,7 @@ object DeriveProduct:
   end handleTargetImpl
 
   inline def handleTargetWithFImpl[F[_], From, To, ToValues <: Tuple, TLabels <: Tuple, AtPos <: Int](
-    inline config: ClassProductConfig[_, _, _],
+    inline config: TypeDeriveConfig[_, _, _],
     fm: Mirror.ProductOf[From]
   )(
     outputArray: F[Array[Any]],
@@ -106,7 +113,7 @@ object DeriveProduct:
   end handleTargetWithFImpl
 
   inline def handleTargetField[At <: Int, Name, T, From, To](
-    inline config: ClassProductConfig[_, _, _],
+    inline config: TypeDeriveConfig[_, _, _],
     fm: Mirror.ProductOf[From]
   )(
     outputArray: Array[Any],
@@ -114,7 +121,7 @@ object DeriveProduct:
     input: From
   ): Unit = 
     inline config match
-      case config: ClassProductConfig[config, flags, _] =>
+      case config: TypeDeriveConfig[config, flags, _] =>
         inline erasedValue[ConfigOf[config, Name]] match
           case _: FieldConst[_] => outputArray(constValue[At]) = config.overrides(constValue[Name].asInstanceOf)
           case _: FieldComputed[_] => 
@@ -127,7 +134,7 @@ object DeriveProduct:
   end handleTargetField       
 
   inline def handleTargetFieldWithF[F[_], At <: Int, Name, T, From, To](
-    inline config: ClassProductConfig[_, _, _],
+    inline config: TypeDeriveConfig[_, _, _],
     fm: Mirror.ProductOf[From]
   )(
     outputArray: F[Array[Any]],
@@ -135,7 +142,7 @@ object DeriveProduct:
     input: From
   )(using sup: TransformerFSupport[F]): F[Array[Any]] = 
     inline config match
-      case config: ClassProductConfig[config, flags, _] =>
+      case config: TypeDeriveConfig[config, flags, _] =>
         inline erasedValue[ConfigOf[config, Name]] match
           case _: FieldConst[_] =>
             sup.map(outputArray, { outputArray =>
@@ -176,7 +183,7 @@ object DeriveProduct:
   end handleTargetFieldWithF
 
   inline def extractFromSource[TargetAt <: Int, LabelAt, TypeAt, From, To, Flags <: Tuple](
-    inline config: ClassProductConfig[_, Flags, _],
+    inline config: TypeDeriveConfig[_, Flags, _],
     fm: Mirror.ProductOf[From]
   )(outputArray: Array[Any], inputArray: IArray[Any]): Unit = 
     findInSource[From, To, LabelAt, fm.MirroredElemLabels, TypeAt, fm.MirroredElemTypes, 0](
@@ -184,9 +191,9 @@ object DeriveProduct:
     
 
   inline def findInSource[From, To, Field, SourceFields <: Tuple, Tpe, SourceTypes <: Tuple, Pos <: Int](
-    inline config: ClassProductConfig[_, _, _])(outputArray: Array[Any], inputArray: IArray[Any], targetPosition: Int): Unit = 
+    inline config: TypeDeriveConfig[_, _, _])(outputArray: Array[Any], inputArray: IArray[Any], targetPosition: Int): Unit = 
     inline config match
-      case c: ClassProductConfig[_, flags, path] =>
+      case c: TypeDeriveConfig[_, flags, path] =>
         inline (erasedValue[SourceFields], erasedValue[SourceTypes]) match
           case _: (Field *: _, Tpe *: _) =>
             outputArray(targetPosition) = inputArray(constValue[Pos])
@@ -194,22 +201,16 @@ object DeriveProduct:
             summonFrom {
               case transformer: Transformer[tpe, Tpe] =>
                 val fixed = transformer.asInstanceOf[Transformer[Any, Tpe]]
-                outputArray(targetPosition) = fixed.transform(inputArray(constValue[Pos]).asInstanceOf[tpe])
+                outputArray(targetPosition) = fixed.transform(inputArray(constValue[Pos]))
               case _ =>
-                summonFrom {
-                  case transformer: Transformer[tpe, Tpe] =>
-                    val fixed = transformer.asInstanceOf[Transformer[Any, Tpe]]
-                    outputArray(targetPosition) = fixed.transform(inputArray(constValue[Pos]))
-                  case _ =>
-                    inline SpecialDerive.deriveSpecialCases[tpe, Tpe, flags, path Concat "." Concat Field] match
-                      case Some(transformer) =>
-                        outputArray(targetPosition) = transformer.asInstanceOf[Transformer[Any, Tpe]].transform(inputArray(constValue[Pos]))
-                      case None =>
-                        TransformerDerive.deriveConfigured[tpe, Tpe, path Concat "." Concat Field](
-                          configOfAtPath[Tpe, TransformerFlag.DefaultValues *: EmptyTuple, path Concat "." Concat Field](defaultDefinitionWithFlags))
-                          .asInstanceOf[Transformer[Any, Tpe]]
-                          .transform(inputArray(constValue[Pos]))
-                }             
+                inline SpecialDerive.deriveSpecialCases[tpe, Tpe, flags, path Concat "." Concat Field] match
+                  case Some(transformer) =>
+                    outputArray(targetPosition) = transformer.asInstanceOf[Transformer[Any, Tpe]].transform(inputArray(constValue[Pos]))
+                  case None =>
+                    TransformerDerive.deriveConfigured[tpe, Tpe, path Concat "." Concat Field](
+                      configOfAtPath[Tpe, TransformerFlag.DefaultValues *: EmptyTuple, path Concat "." Concat Field](defaultDefinitionWithFlags))
+                      .asInstanceOf[Transformer[Any, Tpe]]
+                      .transform(inputArray(constValue[Pos]))           
             }
           case _: (_ *: sourceFields, _ *: sourceTypes) =>
             findInSource[From, To, Field, sourceFields, Tpe, sourceTypes, Pos + 1](config)(outputArray, inputArray, targetPosition)
@@ -224,14 +225,14 @@ object DeriveProduct:
   end findInSource
 
   inline def findInSourceWithF[F[_], From, To, Field, SourceFields <: Tuple, Tpe, SourceTypes <: Tuple, Pos <: Int](
-    inline config: ClassProductConfig[_, _, _]
+    inline config: TypeDeriveConfig[_, _, _]
   )(
     outputArray: F[Array[Any]], 
     inputArray: IArray[Any], 
     targetPosition: Int
   )(using sup: TransformerFSupport[F]): Unit = 
     inline config match
-      case c: ClassProductConfig[_, flags, path] =>
+      case c: TypeDeriveConfig[_, flags, path] =>
         inline (erasedValue[SourceFields], erasedValue[SourceTypes]) match
           case _: (Field *: _, Tpe *: _) =>
             sup.map(outputArray, outputArray => outputArray(targetPosition) = inputArray(constValue[Pos]))
@@ -294,25 +295,25 @@ end DeriveProduct
 
 object DeriveUtils:
 
-  final class ClassProductConfig[Config <: Tuple, Labels <: Tuple, Path <: String](
+  final class TypeDeriveConfig[Config <: Tuple, Labels <: Tuple, Path <: String](
     val overrides: Map[String, Any],
     val defaults: Map[String, Any]
   )
 
   inline def configOf[To, Config <: Tuple, Labels <: Tuple](
     definition: TransformerDefinition[_, To, Config, Labels]
-  ): ClassProductConfig[Config, Labels, ""] =
-    ClassProductConfig(definition.overrides, MacroUtils.getDefaultParams[To])
+  ): TypeDeriveConfig[Config, Labels, ""] =
+    TypeDeriveConfig(definition.overrides, MacroUtils.getDefaultParams[To])
 
   inline def configOf[To, Config <: Tuple, Labels <: Tuple](
     definition: TransformerFDefinition[_, _, To, Config, Labels]
-  ): ClassProductConfig[Config, Labels, ""] =
-    ClassProductConfig(definition.overrides, MacroUtils.getDefaultParams[To])
+  ): TypeDeriveConfig[Config, Labels, ""] =
+    TypeDeriveConfig(definition.overrides, MacroUtils.getDefaultParams[To])
 
   inline def configOfAtPath[To, Labels <: Tuple, Path <: String](
     definition: TransformerDefinition[_, To, EmptyTuple, Labels]
-  ): ClassProductConfig[EmptyTuple, Labels, Path] =
-    ClassProductConfig(definition.overrides, MacroUtils.getDefaultParams[To])
+  ): TypeDeriveConfig[EmptyTuple, Labels, Path] =
+    TypeDeriveConfig(definition.overrides, MacroUtils.getDefaultParams[To])
 
   import TransformerCfg.*
 

@@ -77,7 +77,7 @@ object TransformerIntoSpec extends TestSuite:
             )
           )
 
-          val expectedReview = ReviewedBook(
+          val expectedReview = BookReview(
             "Average book",
             List(
               ChapterReview("Nice chapter", 1, "Lorem ipsum"),
@@ -86,13 +86,42 @@ object TransformerIntoSpec extends TestSuite:
             "I liked it"
           )
 
-          given transformer: Transformer[Book, ReviewedBook] =
-            defaultDefinition[Book, ReviewedBook]
+          given transformer: Transformer[Book, BookReview] =
+            defaultDefinition[Book, BookReview]
               .enableDefaultValues
               .withFieldConst(_.review, "I liked it")
               .buildTransformer
 
           book.transformTo ==> expectedReview
+          
+        }
+
+        "builds correct transformer for coproducts" - {
+
+          val book: LibraryObject = LibraryObject.Book("Nice book", List(Chapter("The beginning", 1, List("Lorem ipsum..."))))
+          val newspaper: LibraryObject = LibraryObject.Newspaper("Nice newspaper", List("Lorem ipsum..."))
+          val movie: LibraryObject = LibraryObject.Movie("Nice movie", Array.empty)
+
+          val indexedBook: IndexedObject = IndexedObject.Book("Nice book", List(IndexedChapter("The beginning", 1, List("Lorem ipsum..."), 101)), 1)
+          val indexedNewspaper: IndexedObject = IndexedObject.Newspaper("Nice newspaper", List("Lorem ipsum..."), 2)
+          val indexedMovie: IndexedObject = IndexedObject.Movie("Nice movie", Array.empty, 3)
+
+          given transformerFromIndex: Transformer[IndexedObject, LibraryObject] =
+            defaultDefinition[IndexedObject, LibraryObject].buildTransformer
+
+          given transformerToIndex: Transformer[LibraryObject, IndexedObject] =
+            defaultDefinition[LibraryObject, IndexedObject]
+              .enableDefaultValues
+              .buildTransformer
+
+          assert(
+            book.transformTo == indexedBook,
+            indexedBook.transformTo == book,
+            newspaper.transformTo == indexedNewspaper,
+            indexedNewspaper.transformTo == newspaper,
+            movie.transformTo == indexedMovie,
+            indexedMovie.transformTo == movie
+          )
           
         }
 
@@ -136,7 +165,7 @@ object TransformerIntoSpec extends TestSuite:
             )
           )
 
-          val expectedReview = ReviewedBook(
+          val expectedReview = BookReview(
             "Average book",
             List(
               ChapterReview("Nice chapter", 1, "Lorem ipsum"),
@@ -145,8 +174,8 @@ object TransformerIntoSpec extends TestSuite:
             "I liked it very much"
           )
 
-          given transformer: TransformerF[Option, Book, ReviewedBook] =
-            defaultDefinition[Book, ReviewedBook]
+          given transformer: TransformerF[Option, Book, BookReview] =
+            defaultDefinition[Book, BookReview]
               .enableDefaultValues
               .withFieldConstF(_.review, Option("I liked it very much"))
               .buildTransformer
