@@ -2,7 +2,7 @@ package experimental.chimneylike.internal.derived
 
 import experimental.chimneylike.*
 import experimental.chimneylike.dsl.*
-import experimental.chimneylike.internal.utils.MacroUtils
+import experimental.chimneylike.internal.utils.*
 import experimental.chimneylike.internal.*
 import scala.compiletime.ops.int.*
 import scala.compiletime.*
@@ -20,7 +20,6 @@ object TransformerDerive:
     deriveConfiguredF[F, From, To, ""](configOf(config))
  
   inline def deriveConfigured[From, To, P <: String](inline config: TypeDeriveConfig[_, _, P]): Transformer[From, To] =
-    MacroUtils.reportPointOfDerivation(constValue[P])
     summonFrom {
       case fm: Mirror.ProductOf[From] =>
         summonFrom {
@@ -30,7 +29,7 @@ object TransformerDerive:
                 val input = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
                 val output = new Array[Any](constValue[Tuple.Size[tm.MirroredElemTypes]])
                 DeriveProduct.handleTargetImpl[From, To, tm.MirroredElemTypes, tm.MirroredElemLabels, 0](config, fm)(output.asInstanceOf, input.asInstanceOf, from)
-                tm.fromProduct(Tuple.fromArray(output))
+                tm.fromProduct(ArrayProduct(output))
           case _ =>
             MacroUtils.reportErrorAtPath[P](constValue[P], "Automatic derivation not supported (yet) for supplied types")
         }
@@ -50,7 +49,6 @@ object TransformerDerive:
   inline def deriveConfiguredF[F[_], From, To, P <: String](inline
    config: TypeDeriveConfig[_, _, P]
   )(using sup: TransformerFSupport[F]): TransformerF[F, From, To] = 
-    MacroUtils.reportPointOfDerivation(constValue[P])
     summonFrom {
       case fm: Mirror.ProductOf[From] =>
         summonFrom {
@@ -60,7 +58,7 @@ object TransformerDerive:
                 val input = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
                 val output = sup.pure(new Array[Any](constValue[Tuple.Size[tm.MirroredElemTypes]]))
                 DeriveProduct.handleTargetWithFImpl[F, From, To, tm.MirroredElemTypes, tm.MirroredElemLabels, 0](config, fm)(output.asInstanceOf, input.asInstanceOf, from)
-                sup.map(output, output => tm.fromProduct(Tuple.fromArray(output)))
+                sup.map(output, output => tm.fromProduct(ArrayProduct(output)))
           case _ =>
             MacroUtils.reportErrorAtPath[P](constValue[P], "Automatic derivation not supported (yet) for supplied types")
         }

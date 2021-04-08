@@ -1,10 +1,10 @@
 package experimental.chimneylike
 
-import dsl.*
-import internal.utils.MacroUtils
-import internal.*
+import experimental.chimneylike.dsl.*
+import experimental.chimneylike.internal.utils.MacroUtils
+import experimental.chimneylike.internal.*
+import experimental.chimneylike.examples.*
 import utest.*
-import examples.*
 
 object TransformerIntoSpec extends TestSuite:
   val tests = Tests {

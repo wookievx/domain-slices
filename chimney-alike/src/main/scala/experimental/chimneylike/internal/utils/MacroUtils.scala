@@ -44,8 +44,6 @@ object MacroUtils:
         for p <- sym.caseFields if p.flags.is(Flags.HasDefault)
         yield p.name
 
-      println(s"Checking out: ${name.show}")
-
       name match 
         case '{$n: String} =>
           n.value match
@@ -108,6 +106,7 @@ object MacroUtils:
   }
 
   inline def reportPointOfDerivation[P <: String](inline path: P) = ${reportPointOfDerivationImpl('path)}
+
   private def reportPointOfDerivationImpl[P <: String](path: Expr[P])(using Quotes): Expr[Unit] = {
     path.value match
       case Some(path) =>
@@ -116,5 +115,15 @@ object MacroUtils:
       case None =>
         '{}
   }
+
+  inline def printAtCompileTime[P <: String] = ${printAtCompileTimeImpl[P]}
+
+  private def printAtCompileTimeImpl[P <: String: Type](using Quotes): Expr[Unit] =
+    Type.valueOfConstant[P] match
+      case Some(p) =>
+        println(p)
+        '{}
+      case None =>
+        '{}
 
 end MacroUtils
