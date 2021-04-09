@@ -1,10 +1,10 @@
 package experimental.chimneylike
 
-import experimental.chimneylike.dsl.*
+import experimental.chimneylike.dsl._
 import experimental.chimneylike.internal.utils.MacroUtils
-import experimental.chimneylike.internal.*
-import experimental.chimneylike.examples.*
-import utest.*
+import experimental.chimneylike.internal._
+import experimental.chimneylike.examples._
+import utest._
 
 object PatcherSpec extends TestSuite {
   val tests = Tests {
@@ -21,7 +21,7 @@ object PatcherSpec extends TestSuite {
 
         val updates = Book("Long book", List.range(1, 20).map(actualChapter))
 
-        val patched = target.using(updates).ignoreRedundantPatcherFields.patch
+        val patched: BookReview = target.using(updates).ignoreRedundantPatcherFields.patch
         assert(patched == BookReview("Long book", List.range(1, 20).map(properReview), "lorem ipsum dolor sit amet"))
       }
 
@@ -54,6 +54,25 @@ object PatcherSpec extends TestSuite {
           testMovie.using(updateMovie).patch ==
             IndexedObject.Movie("Indexed movie", Vector(1, 2, 3, 4), index = 3)
         )
+      }
+
+      "correctly applies combined changes in products" - {
+        def mockReview(n: Int) = ChapterReview(s"placeholder$n", n, "lorem ipsum dolor sit amet")
+        val mockAbstractReview =  AbstractChapterReview("nobody expects spanish inquisition")
+
+        def actualChapter(n: Int) = Chapter(s"Chapter: $n", n, lines = List("I am lazy, did not read that"))
+
+        def properReview(n: Int) = ChapterReview(s"Chapter: $n", n, "lorem ipsum dolor sit amet")
+        def properReviewDouble(n: Int) = ChapterReview(s"Chapter: $n", n, "nobody expects spanish inquisition")
+
+        val target = BookReview("placeholder", List.range(1, 20).map(mockReview), "lorem ipsum dolor sit amet")
+
+        val updates = Book("Long book", List.range(1, 20).map(actualChapter))
+        val updatesReview = AbstractBookReview(List.fill(5)(mockAbstractReview), "It is really good book")
+
+        val patched: BookReview = target.using(updates).and(updatesReview).ignoreRedundantPatcherFields.patch
+
+        assert(patched == BookReview("Long book", List.range(1, 6).map(properReviewDouble) ++ List.range(6, 20).map(properReview), "It is really good book"))
       }
     }
   }

@@ -86,15 +86,41 @@ object MacroUtils:
     import qctx.reflect._
     println(Printer.TreeShortCode.show(any.asTerm))
     any
-  }  
-
-  inline def showType[T]: Unit = ${ printType[T] }
-  private def printType[T: Type](using quotes: Quotes, tpe: Type[T]): Expr[Unit] = {
-    println(s"Got type: ${tpe}")
-    '{}
   }
 
+  transparent inline def showTypeVal[T] = ${showTypeImpl[T]}
+
+  private def showTypeImpl[T: Type](using quotes: Quotes): Expr[String] =
+    Expr(Type.show[T])
+
+  inline def showType[T]: Unit = ${ printType[T] }
+  private def printType[T: Type](using quotes: Quotes): Expr[Unit] =
+    println(s"Got type: ${Type.show[T]}")
+    '{}
+  end printType
+
+  transparent inline def summonProductOf[T] = ${attemptSummonMirror[T]}
+
+  private def attemptSummonMirror[T: Type](using q: Quotes): Expr[Any] = {
+    import q.reflect.report
+    Expr.summon[Mirror.ProductOf[T]] match
+      case Some(product) => product
+      case None => report.throwError(s"Failed to summon product of t: ${Type.show[T]}")
+  }
+
+  inline def reportErrorAtPathWithType[P <: String, Error <: String, T](inline constantPart: String) = ${ reportErrorAtPathWithTypeImpl[P, Error, T]('constantPart) }
+
   inline def reportErrorAtPath[P <: String](inline path: P, inline constantPart: String) = ${ reportErrorAtPathImpl('path, 'constantPart) }
+
+  private def reportErrorAtPathWithTypeImpl[P <: String: Type, Error <: String: Type, T: Type](constantPart: Expr[String])(using q: Quotes): Expr[Nothing] =
+    import q.reflect.report
+    (Type.valueOfConstant[P], constantPart.value, Type.valueOfConstant[Error]) match
+      case (Some(path), Some(v), Some(error)) =>
+        report.throwError(s"$constantPart at $path, type in question: ${Type.show[T]}, error: ${error}")
+      case _ =>
+        report.throwError("Unable to produce nice error, bug in library")
+
+  end reportErrorAtPathWithTypeImpl
 
   private def reportErrorAtPathImpl[P <: String](path: Expr[P], constantPart: Expr[String])(using q: Quotes): Expr[Nothing] = {
     import q.reflect.report

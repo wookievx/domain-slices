@@ -28,4 +28,14 @@ object PatcherDerive:
         error(constValue["Requested patcher combination not supported, at: " Concat Path])
     }
 
+  inline def derivedN[T, P <: Tuple, Config <: Tuple]: Patcher[T, P] =
+    summonFrom {
+      case tm: Mirror.ProductOf[T] =>
+        PatcherDeriveProduct.deriveProductN[T, P, Config](using tm)
+      case tm: Mirror.SumOf[T] =>
+        error(constValue["Requested patcherN combination not supported"])
+      case _ =>
+        error(constValue["Requested patcherN combination not supported"])
+    }
+
 end PatcherDerive

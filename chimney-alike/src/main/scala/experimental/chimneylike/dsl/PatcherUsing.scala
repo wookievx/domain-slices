@@ -14,7 +14,56 @@ import experimental.chimneylike.internal.derived.PatcherDerive
   * @tparam P type of patch object
   * @tparam C type-level encoded configuration of patcher
   */
-class PatcherUsing[T, P, C <: Tuple](val obj: T, val objPatch: P):
+class PatcherUsing[T, P, C <: Tuple](val obj: T, val objPatch: P) extends PatcherDSL[T, P, C, [NC <: Tuple] =>> PatcherUsing[T, P, NC]]:
+
+  /** Combines this configuration with next patch object (for efficient processing of complex data)
+    * Any path from nextPatch will override changes from previous patches
+    *
+    * @param nextPatch next patch to process
+    * @tparam NP type of patch object to add to configuration
+    * @return [[PatcherUsingN]]
+    */
+  inline def and[NP](nextPatch: NP): PatcherUsingN[T, (P, NP), C] = PatcherUsingN(obj, (objPatch, nextPatch))
+
+  /** Applies configured patching in-place
+    *
+    * @return patched value
+    */
+  inline def patch: T = PatcherDerive.derived[T, P, C, ""].patch(obj, objPatch)
+end PatcherUsing
+
+extension [T](obj: T)
+  inline def using[P](patch: P): PatcherUsing[T, P, EmptyTuple] = PatcherUsing(obj, patch)
+
+/** Provides operations to customize patcher logic for specific
+  * object value and multiple patch values (for efficient data processing with patcher, no copying multiple updates at once).
+  *
+  * @param obj object to patch
+  * @param objPatch patch objects
+  * @tparam T type of object to apply patch to
+  * @tparam PF type of patch object that dsl is focusing on
+  * @tparam P type of patch objects (tuple)
+  * @tparam C type-level encoded configuration of patcher
+  */
+class PatcherUsingN[T, P <: Tuple, C <: Tuple](val obj: T, patchers: P) extends PatcherDSL[T, P, C, [NC <: Tuple] =>> PatcherUsingN[T, P, NC]]:
+
+  /** Combines this configuration with next patch object (for efficient processing of complex data)
+    * Any path from nextPatch will override changes from previous patches
+    *
+    * @param nextPatch next patch to process
+    * @tparam NP type of patch object to add to configuration
+    * @return [[PatcherUsingN]]
+    */
+  inline def and[NP](nextPatch: NP): PatcherUsingN[T, Tuple.Concat[P, NP *: EmptyTuple], C] = PatcherUsingN(obj, patchers ++ (nextPatch *: EmptyTuple))
+
+  /** Applies configured patching in-place
+    *
+    * @return patched value
+    */
+  inline def patch: T = PatcherDerive.derivedN[T, P, C].patch(obj, patchers)
+end PatcherUsingN
+
+trait PatcherDSL[T, P, C <: Tuple, DSL[_ <: Tuple]]:
   /** In case when both object to patch and patch value contain field
     * of type `Option[T]`, this option allows to treat `None` value in
     * patch like the value was not provided.
@@ -23,10 +72,10 @@ class PatcherUsing[T, P, C <: Tuple](val obj: T, val objPatch: P):
     * the value of such field on patching.
     *
     * @see [[https://scalalandio.github.io/chimney/patchers/options-handling.html]] for more details
-    * @return [[experimental.chimneylike.dsl.PatcherUsing]]
+    * @return [[DSL]]
     */
-  inline def ignoreNoneInPatch: PatcherUsing[T, P, EnablePatcherConfig[C, IgnoreNoneInPatch]] =
-    this.asInstanceOf[PatcherUsing[T, P, EnablePatcherConfig[C, IgnoreNoneInPatch]]]
+  inline def ignoreNoneInPatch: DSL[EnablePatcherConfig[C, IgnoreNoneInPatch]] =
+    this.asInstanceOf[DSL[EnablePatcherConfig[C, IgnoreNoneInPatch]]]
 
   /** In case that patch object contains a redundant field (i.e. field that
     * is not present in patched object type), this option enables ignoring
@@ -37,28 +86,18 @@ class PatcherUsing[T, P, C <: Tuple](val obj: T, val objPatch: P):
     * typos.
     *
     * @see [[https://scalalandio.github.io/chimney/patchers/redundant-fields.html]] for more details
-    * @return [[experimental.chimneylike.dsl.PatcherUsing]]
+    * @return [[DSL]]
     */
-  inline def ignoreRedundantPatcherFields: PatcherUsing[T, P, EnablePatcherConfig[C, IgnoreRedundantPatcherFields]] =
-    this.asInstanceOf[PatcherUsing[T, P, EnablePatcherConfig[C, IgnoreRedundantPatcherFields]]]
+  inline def ignoreRedundantPatcherFields: DSL[EnablePatcherConfig[C, IgnoreRedundantPatcherFields]] =
+    this.asInstanceOf[DSL[EnablePatcherConfig[C, IgnoreRedundantPatcherFields]]]
 
   /** In case that patch object contains a field containing iterable of the same type element
     * as the field of object patched, this option enables making path override all values in patched object
     * (by default only N-first fields in iterable is modified, where N is size of the iterable from patch object)
     *
-    * @return [[experimental.chimneylike.dsl.PatcherUsing]]
+    * @return [[DSL]]
     */
-  inline def overwriteIterablesOnTheSameType: PatcherUsing[T, P, EnablePatcherConfig[C, OverwriteIterablesOnTheSameType]] =
-    this.asInstanceOf[PatcherUsing[T, P, EnablePatcherConfig[C, OverwriteIterablesOnTheSameType]]]
+  inline def overwriteIterablesOnTheSameType: DSL[EnablePatcherConfig[C, OverwriteIterablesOnTheSameType]] =
+    this.asInstanceOf[DSL[EnablePatcherConfig[C, OverwriteIterablesOnTheSameType]]]
 
-  /** Applies configured patching in-place
-    *
-    * @return patched value
-    */
-  inline def patch: T = PatcherDerive.derived[T, P, C, ""].patch(obj, objPatch)
-
-
-end PatcherUsing
-
-extension [T](obj: T)
-  inline def using[P](patch: P): PatcherUsing[T, P, EmptyTuple] = PatcherUsing(obj, patch)
+end PatcherDSL

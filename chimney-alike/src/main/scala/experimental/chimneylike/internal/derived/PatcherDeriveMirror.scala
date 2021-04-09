@@ -21,7 +21,7 @@ object PatcherDeriveProduct:
       def patch(obj: T, patch: P): T =
         val input = Tuple.fromProduct(patch.asInstanceOf[Product]).toIArray
         val output = Tuple.fromProduct(obj.asInstanceOf[Product]).toArray
-        applyFields[pm.MirroredElemLabels, pm.MirroredElemTypes, tm.MirroredElemLabels, tm.MirroredElemTypes, Config, Path](
+        applyFields[pm.MirroredElemLabels, pm.MirroredElemTypes, tm.MirroredElemLabels, tm.MirroredElemTypes, Config, Path, T](
           patchPosition = 0,
           targetPosition = 0
         )(
@@ -31,7 +31,44 @@ object PatcherDeriveProduct:
         tm.fromProduct(ArrayProduct(output))
   }
 
-  inline def applyFields[PFields <: Tuple, PTypes <: Tuple, TFields <: Tuple, TTypes <: Tuple, Config <: Tuple, Path <: String](
+  inline def deriveProductN[T, P <: Tuple, Config <: Tuple](using tm: Mirror.ProductOf[T]): Patcher[T, P] =
+    printAtCompileTime["Deriving product of n patchers"]
+    new Patcher[T, P]:
+      def patch(obj: T, patch: P): T =
+        val output = Tuple.fromProduct(obj.asInstanceOf[Product]).toArray
+        deriveProducNImpl[T, P, Config, 0](output.asInstanceOf, patch)
+        tm.fromProduct(ArrayProduct(output))
+  end deriveProductN
+
+  private[derived] inline def deriveProducNImpl[T, P <: Tuple, Config <: Tuple, Pos <: Int](target: Array[Any], patch: P)(using tm: Mirror.ProductOf[T]): Unit =
+    inline erasedValue[P] match
+      case _: (p *: patches) =>
+        showType[p]
+        inline summonProductOf[p] match
+          case pm: Mirror.ProductOf[p] =>
+            deriveInplace[T, p, Config, Pos](using tm, pm).patch(target, patch.asInstanceOf[NonEmptyTuple].head.asInstanceOf[p])
+          case _ =>
+            error("WTF")
+        deriveProducNImpl[T, patches, Config, Pos + 1](target, patch.asInstanceOf[NonEmptyTuple].tail.asInstanceOf[patches])
+      case _: EmptyTuple =>
+  end deriveProducNImpl
+
+  private[derived] inline def deriveInplace[T, P, Config <: Tuple, Pos <: Int](using tm: Mirror.ProductOf[T], pm: Mirror.ProductOf[P]): Patcher[Array[Any], P] =
+    printAtCompileTime[Concat["Deriving inplace patcher at: ", ToString[Pos]]]
+    new Patcher[Array[Any], P]:
+      def patch(obj: Array[Any], patch: P): Array[Any] =
+        val input = Tuple.fromProduct(patch.asInstanceOf[Product]).toIArray
+        applyFields[pm.MirroredElemLabels, pm.MirroredElemTypes, tm.MirroredElemLabels, tm.MirroredElemTypes, Config, "", T](
+          patchPosition = 0,
+          targetPosition = 0
+        )(
+          input,
+          obj
+        )
+        obj
+  end deriveInplace
+
+  inline def applyFields[PFields <: Tuple, PTypes <: Tuple, TFields <: Tuple, TTypes <: Tuple, Config <: Tuple, Path <: String, T](
     patchPosition: Int,
     targetPosition: Int
   )(
@@ -41,14 +78,14 @@ object PatcherDeriveProduct:
     inline (erasedValue[PFields], erasedValue[PTypes]) match
       case _: (pField *: pFields, pType *: pTypes) =>
         printAtCompileTime["Looking up: " Concat pField Concat " at " Concat Path]
-        applyField[pField, pType, TFields, TTypes, Config, Path Concat "." Concat pField](
+        applyField[pField, pType, TFields, TTypes, Config, Path Concat "." Concat pField, T](
           patchPosition = patchPosition,
           targetPosition = targetPosition
         )(
           patch = patch,
           target = target
         )
-        applyFields[pFields, pTypes, TFields, TTypes, Config, Path](
+        applyFields[pFields, pTypes, TFields, TTypes, Config, Path, T](
           patchPosition = patchPosition + 1,
           targetPosition = targetPosition
         )(
@@ -58,7 +95,7 @@ object PatcherDeriveProduct:
       case _ =>
 
 
-  private inline def applyField[PField, PType, TFields <: Tuple, TTypes <: Tuple, Config <: Tuple, Path <: String](
+  private inline def applyField[PField, PType, TFields <: Tuple, TTypes <: Tuple, Config <: Tuple, Path <: String, T](
     patchPosition: Int,
     targetPosition: Int
   )(
@@ -73,7 +110,7 @@ object PatcherDeriveProduct:
         printAtCompileTime["Having regular target: " Concat PField Concat " at " Concat Path]
         handleOtherTarget[tType, PType, Config, Path](patchPosition, targetPosition)(patch, target)
       case _: (_ *: tfields, _ *: ttypes) =>
-        applyField[PField, PType, tfields, ttypes, Config, Path](
+        applyField[PField, PType, tfields, ttypes, Config, Path, T](
           patchPosition = patchPosition,
           targetPosition = targetPosition + 1
         )(
@@ -82,7 +119,7 @@ object PatcherDeriveProduct:
         )
       case _: (EmptyTuple, _) =>
         inline if constValue[HasPatcherCfg[Config, PatcherCfg.IgnoreRedundantPatcherFields]] then {}
-        else error(constValue["Derviation failed because patcher object contains field: " Concat PField Concat " not found in target, path: " Concat Path])
+        else reportErrorAtPathWithType[Path, Path, T]("Derivation failed because target type is missing a field")
 
   private inline def handleOptionTarget[TType, PType, Config <: Tuple, Path <: String](
     patchPosition: Int,
