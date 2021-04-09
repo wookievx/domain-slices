@@ -17,7 +17,7 @@ end TransformerCfg
 
 type EnableConfig[Config <: Tuple, Cfg <: TransformerCfg] = Cfg *: DisableConfig[Config, Cfg]
 
-import TransformerCfg.*
+import TransformerCfg._
 
 type DisableConfig[Config <: Tuple, Cfg <: TransformerCfg] <: Tuple = Cfg match
   case FieldConst[name] => DisableField[Config, name]

@@ -4,7 +4,8 @@ val settings = Seq(
   testFrameworks += new TestFramework("utest.runner.Framework"),
   libraryDependencies += "com.lihaoyi" %% "utest" % "0.7.8" % "test",
   version := "0.1.0",
-  scalaVersion := scala3Version
+  scalaVersion := scala3Version,
+  scalacOptions ++= Seq("-Xmax-inlines", "64")
 )
 
 

@@ -1,8 +1,8 @@
 package experimental.chimneylike.internal.derived
 
-import scala.deriving.*
-import scala.compiletime.*
-import experimental.chimneylike.*
+import scala.deriving._
+import scala.compiletime._
+import experimental.chimneylike._
 import experimental.chimneylike.internal.utils.MacroUtils
 
 object PatcherDerive:

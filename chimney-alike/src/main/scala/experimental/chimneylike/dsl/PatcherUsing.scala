@@ -2,7 +2,7 @@ package experimental.chimneylike.dsl
 
 import experimental.chimneylike.internal.EnablePatcherConfig
 import experimental.chimneylike.internal.PatcherCfg
-import experimental.chimneylike.internal.PatcherCfg.*
+import experimental.chimneylike.internal.PatcherCfg._
 import experimental.chimneylike.internal.derived.PatcherDerive
 
 /** Provides operations to customize patcher logic for specific

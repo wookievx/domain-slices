@@ -1,15 +1,15 @@
 package experimental.chimneylike.internal.derived
 
-import experimental.chimneylike.*
-import experimental.chimneylike.dsl.*
-import experimental.chimneylike.internal.utils.MacroUtils.*
+import experimental.chimneylike._
+import experimental.chimneylike.dsl._
+import experimental.chimneylike.internal.utils.MacroUtils._
 import experimental.chimneylike.internal.utils.ArrayProduct
-import experimental.chimneylike.internal.*
+import experimental.chimneylike.internal._
 
-import scala.compiletime.ops.int.*
-import scala.compiletime.*
-import scala.deriving.*
-import scala.quoted.*
+import scala.compiletime.ops.int._
+import scala.compiletime._
+import scala.deriving._
+import scala.quoted._
 
 
 object PatcherDeriveProduct:

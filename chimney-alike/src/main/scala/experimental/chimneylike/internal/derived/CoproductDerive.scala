@@ -1,24 +1,27 @@
 package experimental.chimneylike.internal.derived
 
-import experimental.chimneylike.*
-import experimental.chimneylike.dsl.*
+import experimental.chimneylike._
+import experimental.chimneylike.dsl._
 import experimental.chimneylike.internal.utils.MacroUtils
-import experimental.chimneylike.internal.*
-import scala.compiletime.ops.int.*
-import scala.compiletime.*
-import scala.deriving.*
+import experimental.chimneylike.internal._
+import scala.compiletime.ops.int._
+import scala.compiletime._
+import scala.deriving._
 
 object CoproductDerive:
-  import DeriveUtils.*
-  inline def derived[From, To, Path <: String](inline config: TypeDeriveConfig[_, _, Path])(using fm: Mirror.SumOf[From], tm: Mirror.SumOf[To]): Transformer[From, To] = 
-    new Transformer[From, To]:
-      def transform(from: From): To =
-        findACase[From, To, fm.MirroredElemTypes, tm.MirroredElemTypes, fm.MirroredElemLabels, 0](config)(from)
+  import DeriveUtils._
 
-  inline def derivedF[F[_], From, To, Path <: String](inline config: TypeDeriveConfig[_, _, Path])(using fm: Mirror.SumOf[From], tm: Mirror.SumOf[To], sup: TransformerFSupport[F]): TransformerF[F, From, To] = 
-    new TransformerF[F, From, To]:
-      def transform(from: From): F[To] =
-        findACaseF[F, From, To, fm.MirroredElemTypes, tm.MirroredElemTypes, fm.MirroredElemLabels, 0](config)(from)
+  class GenericTransformer[From, To](transformImpl: From => To) extends Transformer[From, To]:
+    def transform(from: From): To = transformImpl(from)
+
+  class GenericFTransformer[F[_], From, To](transformImpl: From => F[To]) extends TransformerF[F, From, To]:
+    def transform(from: From): F[To] = transformImpl(from)
+
+  inline def derived[From, To, Path <: String](inline config: TypeDeriveConfig[_, _, Path])(using fm: Mirror.SumOf[From], tm: Mirror.SumOf[To]): Transformer[From, To] =
+    GenericTransformer(findACase[From, To, fm.MirroredElemTypes, tm.MirroredElemTypes, fm.MirroredElemLabels, 0](config)(_))
+
+  inline def derivedF[F[_], From, To, Path <: String](inline config: TypeDeriveConfig[_, _, Path])(using fm: Mirror.SumOf[From], tm: Mirror.SumOf[To], sup: TransformerFSupport[F]): TransformerF[F, From, To] =
+    GenericFTransformer(findACaseF[F, From, To, fm.MirroredElemTypes, tm.MirroredElemTypes, fm.MirroredElemLabels, 0](config)(_))
 
   inline def findACase[From, To, FromLeft <: Tuple, ToLeft <: Tuple, Labels <: Tuple, Position <: Int](inline config: TypeDeriveConfig[_, _, _])(from: From)(using fm: Mirror.SumOf[From]): To = 
     inline (erasedValue[FromLeft], erasedValue[ToLeft], erasedValue[Labels]) match
@@ -35,12 +38,12 @@ object CoproductDerive:
                     .transform(from)
         else
           findACase[From, To, fromLeft, toLeft, labels, Position + 1](config)(from)
-      case _: (EmptyTuple, EmptyTuple, _) => 
+      case _: (EmptyTuple, _, _) =>
         throw new Exception("Should not be here, bug in implementation, report it")
-      case _ =>
+      case _: (_, EmptyTuple, _) =>
         inline config match
           case _: TypeDeriveConfig[_, _, path] =>
-            MacroUtils.reportErrorAtPath(constValue[path], "Structure of transformed coproducts do not match")
+            MacroUtils.reportErrorAtPathWithType[path, "Structure of transformed coproducts do not match", (From, To)]("Transforming coproducts")
   end findACase
 
   inline def findACaseF[F[_], From, To, FromLeft <: Tuple, ToLeft <: Tuple, Labels <: Tuple, Position <: Int](

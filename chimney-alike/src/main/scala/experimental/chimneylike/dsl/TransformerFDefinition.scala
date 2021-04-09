@@ -1,10 +1,10 @@
 package experimental.chimneylike.dsl
 
-import experimental.chimneylike.internal.TransformerFlag.*
-import experimental.chimneylike.internal.dsl.*
-import experimental.chimneylike.internal.*
+import experimental.chimneylike.internal.TransformerFlag._
+import experimental.chimneylike.internal.dsl._
+import experimental.chimneylike.internal._
 import experimental.chimneylike.internal.derived.TransformerDerive
-import experimental.chimneylike.*
+import experimental.chimneylike._
 import experimental.chimneylike.internal.utils.MacroUtils
 import scala.compiletime.error
 

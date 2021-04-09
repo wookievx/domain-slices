@@ -78,6 +78,9 @@ final class TransformerInto[From, To, Config <: Tuple, Flags <: Tuple](
   transparent inline def withFieldRenamed[T](inline selectorFrom: From => T, inline selectorTo: To => T) = 
     withDefinition(definition.withFieldRenamed(selectorFrom, selectorTo))
 
+  inline def transform: To =
+    definition.buildTransformer.transform(source)
+
   transparent inline def withDefinition(inline newDefinition: Any) =
     inline newDefinition match
       case definition: TransformerDefinition[From, To, config, flags] =>

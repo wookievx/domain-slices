@@ -1,16 +1,16 @@
 package experimental.chimneylike
 
-import experimental.chimneylike.dsl.*
+import experimental.chimneylike.dsl._
 import experimental.chimneylike.internal.utils.MacroUtils
-import experimental.chimneylike.internal.*
-import experimental.chimneylike.examples.*
-import utest.*
+import experimental.chimneylike.internal._
+import experimental.chimneylike.examples._
+import utest._
 
 object TransformerIntoSpec extends TestSuite:
   val tests = Tests {
       "TransformerInto" - {
-        import TransformerCfg.*
-        import TransformerFlag.*
+        import TransformerCfg._
+        import TransformerFlag._
         "builds correctly typed definition" - {
           val source = Source(a = 100, b = "100", c = "9000", d = 42L, e = 6.6)
 
@@ -40,8 +40,8 @@ object TransformerIntoSpec extends TestSuite:
       }
 
       "TransformerDefinition" - {
-        import TransformerCfg.*
-        import TransformerFlag.*
+        import TransformerCfg._
+        import TransformerFlag._
 
         "builds correct transformer" - {
 
@@ -128,8 +128,8 @@ object TransformerIntoSpec extends TestSuite:
       }
 
       "TransformerFDefinition" - {
-        import TransformerCfg.*
-        import TransformerFlag.*
+        import TransformerCfg._
+        import TransformerFlag._
 
         "builds correct transformer" - {
 

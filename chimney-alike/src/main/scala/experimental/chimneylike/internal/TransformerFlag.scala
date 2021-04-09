@@ -12,7 +12,7 @@ object TransformerFlag:
   final class UnsafeOption extends TransformerFlag
 end TransformerFlag
 
-import TransformerFlag.*
+import TransformerFlag._
 
 type EnableFlag[Flags <: Tuple, Flag <: TransformerFlag] = Flag *: DisableFlag[Flags, Flag]
 

@@ -1,9 +1,9 @@
 package experimental.chimneylike
 
-import dsl.*
+import dsl._
 import internal.utils.MacroUtils
-import internal.*
-import utest.*
+import internal._
+import utest._
 
 object Playground extends TestSuite:
   val tests = Tests {
@@ -52,7 +52,7 @@ object Playground extends TestSuite:
       }
 
       "combine diferent types of configs and flags" - {
-        import TransformerCfg.*
+        import TransformerCfg._
         type ExpectedConfig = 
           (FieldComputedF["d"], FieldComputed["c"], FieldConst["a"], FieldConstF["b"], WrapperType[Option])
 

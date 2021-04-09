@@ -1,5 +1,7 @@
 package experimental.chimneylike.dsl
 
+import experimental.chimneylike.TransformerFSupport
+
 import scala.compiletime.error
 
 final class TransformerFInto[F[_], From, To, Config <: Tuple, Flags <: Tuple](
@@ -65,6 +67,8 @@ final class TransformerFInto[F[_], From, To, Config <: Tuple, Flags <: Tuple](
   transparent inline def withFieldRenamed[T](inline selectorFrom: From => T, inline selectorTo: To => T) = 
     withDefinitionF(definition.withFieldRenamed(selectorFrom, selectorTo))
 
+  inline def transform(using TransformerFSupport[F]): F[To] =
+    definition.buildTransformer.transform(source)
 
   transparent inline def withDefinitionF(inline newDefinition: Any) =
     inline newDefinition match

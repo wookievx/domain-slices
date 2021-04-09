@@ -1,14 +1,14 @@
 package experimental.chimneylike.internal.utils
 
 import scala.quoted.{given, *}
-import deriving.*, compiletime.*
+import deriving._, compiletime._
 
 object MacroUtils:
 
   inline def getDefaultParams[T]: Map[String, AnyRef] = ${ getDefaultParmasImpl[T] }
   //copied from : https://github.com/dotty-staging/upickle/blob/0213eea95b282b1e961b1d5ad68031365c9a8bb2/implicits/src-3/upickle/implicits/macros.scala
   def getDefaultParmasImpl[T: Type](using Quotes): Expr[Map[String, AnyRef]] =
-    import quotes.reflect.*
+    import quotes.reflect._
     val sym = TypeTree.of[T].symbol
 
     if (sym.isClassDef) {
@@ -35,7 +35,7 @@ object MacroUtils:
   inline def defaultValueExistsIn[T](inline name: Any): Boolean = ${ nameExistsInImpl[T]('name) }
 
   def nameExistsInImpl[T: Type](name: Expr[Any])(using Quotes): Expr[Boolean] =
-    import quotes.reflect.*
+    import quotes.reflect._
     val sym = TypeTree.of[T].symbol
 
     if (sym.isClassDef) {
@@ -60,7 +60,7 @@ object MacroUtils:
   transparent inline def extracNameFromSelector[To, T](inline code: To => T) = ${extractNameFromSelectorImpl('code)}
 
   def extractNameFromSelectorImpl[To: Type, T: Type](code: Expr[To => T])(using Quotes): Expr[String] = 
-    import quotes.reflect.*
+    import quotes.reflect._
     val extractors = new Extractors
     code.asTerm match
      case extractors.InlinedLambda(_, Select(_, name)) => Expr(name)
@@ -69,7 +69,7 @@ object MacroUtils:
   
   class Extractors(using val quotes: Quotes):
     //attempt to strip away consecutive inlines in AST and extract only final lambda
-    import quotes.reflect.*
+    import quotes.reflect._
 
     object InlinedLambda:
       def unapply(arg: Term): Option[(List[ValDef], Term)] = 
@@ -108,6 +108,15 @@ object MacroUtils:
       case None => report.throwError(s"Failed to summon product of t: ${Type.show[T]}")
   }
 
+  transparent inline def attemptSummonInstance[T] = ${attemptSummonInstanceImpl[T]}
+
+  private def attemptSummonInstanceImpl[T: Type](using q: Quotes): Expr[Option[T]] = {
+    import q.reflect.report
+    Expr.summon[T] match
+      case Some(instance) => '{ Some($instance) }
+      case None => '{ None }
+  }
+
   inline def reportErrorAtPathWithType[P <: String, Error <: String, T](inline constantPart: String) = ${ reportErrorAtPathWithTypeImpl[P, Error, T]('constantPart) }
 
   inline def reportErrorAtPath[P <: String](inline path: P, inline constantPart: String) = ${ reportErrorAtPathImpl('path, 'constantPart) }
@@ -115,7 +124,7 @@ object MacroUtils:
   private def reportErrorAtPathWithTypeImpl[P <: String: Type, Error <: String: Type, T: Type](constantPart: Expr[String])(using q: Quotes): Expr[Nothing] =
     import q.reflect.report
     (Type.valueOfConstant[P], constantPart.value, Type.valueOfConstant[Error]) match
-      case (Some(path), Some(v), Some(error)) =>
+      case (Some(path), Some(constantPart), Some(error)) =>
         report.throwError(s"$constantPart at $path, type in question: ${Type.show[T]}, error: ${error}")
       case _ =>
         report.throwError("Unable to produce nice error, bug in library")

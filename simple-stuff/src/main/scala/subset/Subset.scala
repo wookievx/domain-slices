@@ -1,6 +1,6 @@
 package subset
-import scala.deriving.*
-import scala.compiletime.*
+import scala.deriving._
+import scala.compiletime._
 import scala.compiletime.ops.int._
 import scala.collection.mutable.Builder
 import util.DebugUtils

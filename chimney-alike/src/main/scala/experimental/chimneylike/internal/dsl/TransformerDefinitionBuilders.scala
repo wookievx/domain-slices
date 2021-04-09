@@ -1,11 +1,11 @@
 package experimental.chimneylike.internal.dsl
 
-import experimental.chimneylike.dsl.*
+import experimental.chimneylike.dsl._
 import experimental.chimneylike.internal.utils.MacroUtils
-import experimental.chimneylike.internal.*
+import experimental.chimneylike.internal._
 
 import scala.quoted.{given, *}
-import deriving.*, compiletime.*
+import deriving._, compiletime._
 
 object TransformerDefinitionBuilder:
   import GenericTransformerDefinitionBuilder.TransformerDefinitionBuilder

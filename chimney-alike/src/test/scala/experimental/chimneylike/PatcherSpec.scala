@@ -9,7 +9,7 @@ import utest._
 object PatcherSpec extends TestSuite {
   val tests = Tests {
     "PatcherUsing" - {
-      import PatcherCfg.*
+      import PatcherCfg._
       "correctly applies changes in products" - {
         def mockReview(n: Int) = ChapterReview(s"placeholder$n", n, "lorem ipsum dolor sit amet")
 
@@ -70,7 +70,11 @@ object PatcherSpec extends TestSuite {
         val updates = Book("Long book", List.range(1, 20).map(actualChapter))
         val updatesReview = AbstractBookReview(List.fill(5)(mockAbstractReview), "It is really good book")
 
-        val patched: BookReview = target.using(updates).and(updatesReview).ignoreRedundantPatcherFields.patch
+        val patched: BookReview = target
+          .using(updates)
+          .and(updatesReview)
+          .ignoreRedundantPatcherFields
+          .patch
 
         assert(patched == BookReview("Long book", List.range(1, 6).map(properReviewDouble) ++ List.range(6, 20).map(properReview), "It is really good book"))
       }
