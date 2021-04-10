@@ -25,12 +25,12 @@ object TransformerDerive:
       case fm: Mirror.ProductOf[From] =>
         summonFrom {
           case tm: Mirror.ProductOf[To] =>
-            ProductTransformer[From, To](
-              constValue[Tuple.Size[tm.MirroredElemTypes]],
-              tm,
-              (output: Array[Any], input: IArray[Any], from: From) =>
-                DeriveProduct.handleTargetImpl[From, To, tm.MirroredElemTypes, tm.MirroredElemLabels, 0](config, fm)(output.asInstanceOf, input.asInstanceOf, from)
-            )
+            transformerWith[From, To] { from =>
+              val input = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
+              val output = new Array[Any](constValue[Tuple.Size[tm.MirroredElemTypes]])
+              DeriveProduct.handleTargetImpl[From, To, tm.MirroredElemTypes, tm.MirroredElemLabels, 0](config, fm)(output.asInstanceOf, input.asInstanceOf, from)
+              tm.fromProduct(ArrayProduct(output))
+            }
           case _ =>
             MacroUtils.reportErrorAtPath[P](constValue[P], "Automatic derivation not supported (yet) for supplied types")
         }
@@ -54,29 +54,18 @@ object TransformerDerive:
       case fm: Mirror.ProductOf[From] =>
         summonFrom {
           case tm: Mirror.ProductOf[To] =>
-            new TransformerF[F, From, To]:
-              def transform(from: From): F[To] =
-                val input = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
-                val output = sup.pure(new Array[Any](constValue[Tuple.Size[tm.MirroredElemTypes]]))
-                DeriveProduct.handleTargetWithFImpl[F, From, To, tm.MirroredElemTypes, tm.MirroredElemLabels, 0](config, fm)(output.asInstanceOf, input.asInstanceOf, from)
-                sup.map(output, output => tm.fromProduct(ArrayProduct(output)))
+            transformerWithF[F, From, To] { from =>
+              val input = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
+              val output = sup.pure(new Array[Any](constValue[Tuple.Size[tm.MirroredElemTypes]]))
+              DeriveProduct.handleTargetWithFImpl[F, From, To, tm.MirroredElemTypes, tm.MirroredElemLabels, 0](config, fm)(output.asInstanceOf, input.asInstanceOf, from)
+              sup.map(output, output => tm.fromProduct(ArrayProduct(output)))
+            }
           case _ =>
             MacroUtils.reportErrorAtPath[P](constValue[P], "Automatic derivation not supported (yet) for supplied types")
         }
       case _ =>
         MacroUtils.reportErrorAtPath[P](constValue[P], "Automatic derivation not supported (yet) for supplied types")
     }
-
-  class ProductTransformer[From, To](
-    size: Int,
-    tm: Mirror.ProductOf[To],
-    productTransform: (Array[Any], IArray[Any], From) => Unit
-  ) extends Transformer[From, To]:
-    def transform(from: From): To =
-      val input = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
-      val output = new Array[Any](size)
-      productTransform(output, input, from)
-      tm.fromProduct(ArrayProduct(output))
 
 end TransformerDerive
 
@@ -332,7 +321,24 @@ object DeriveUtils:
   type Concat[Path <: String, Field] <: String = Field match
     case String => Path + Field
     case _ => Path
-      
 
+  inline def transformerWith[From, To](inline impl: From => To): Transformer[From, To] = ${implementTransformerWith('impl)}
+
+  inline def transformerWithF[F[_], From, To](inline impl: From => F[To]): TransformerF[F, From, To] = ${implementTransformerFWith('impl)}
+
+  private def implementTransformerWith[From: Type, To: Type](impl: Expr[From => To])(using Quotes): Expr[Transformer[From, To]] =
+    '{
+      new TransformerImpl[From, To]:
+        def transform(from: From): To = ${Expr.betaReduce('{(${impl})(from)})}
+    }
+
+  private def implementTransformerFWith[F[_]: Type, From: Type, To: Type](impl: Expr[From => F[To]])(using Quotes): Expr[TransformerF[F, From, To]] =
+    '{
+      new TransformerFImpl[F, From, To]:
+        def transform(from: From): F[To] = ${Expr.betaReduce('{(${impl})(from)})}
+    }
+
+  abstract class TransformerImpl[From, To] extends Transformer[From, To]
+  abstract class TransformerFImpl[F[_], From, To] extends TransformerF[F, From, To]
 
 end DeriveUtils

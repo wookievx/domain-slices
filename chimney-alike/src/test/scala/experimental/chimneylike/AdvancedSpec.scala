@@ -89,6 +89,7 @@ object AdvancedSpec extends TestSuite {
           .and(transformPatch(updateTwo))
           .and(transformUpdate(updateRemoving))
           .overwriteIterablesOnTheSameType
+          .ignoreNoneInPatch
           .patch
 
         assert(

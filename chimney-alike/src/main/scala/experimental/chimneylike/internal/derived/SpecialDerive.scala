@@ -110,11 +110,11 @@ object SpecialDerive:
       case _ =>
         TransformerDerive.deriveConfigured[A, B, Concat[Path, "[*]"]](configOfAtPath[B, Flags, Concat[Path, "[*]"]](defaultDefinitionWithFlags))
     }
-    new SpecialDerive[IterableOnce[A], Any]({ from =>
+    transformerWith[IterableOnce[A], Any] { from =>
       val builder = summon[Factory[B, Any]].newBuilder
       for elem <- from.iterator do builder += elemTransform.transform(elem)
       builder.result
-    })
+    }
 
   inline def deriveMap[KA, KB, A, B, Flags <: Tuple, Path <: String](using Factory[(KB, B), Map[KB, B]]): Transformer[Map[KA, A], Map[KB, B]] =
     val keyTansform = summonFrom {
@@ -127,11 +127,11 @@ object SpecialDerive:
       case _ =>
         TransformerDerive.deriveConfigured[A, B, Concat[Path, "{:*}"]](configOfAtPath[B, Flags, Concat[Path, "{:*}"]](defaultDefinitionWithFlags))
     }
-    new SpecialDerive[Map[KA, A], Map[KB, B]]({ from =>
+    transformerWith[Map[KA, A], Map[KB, B]] { from =>
       val builder = summon[Factory[(KB, B), Map[KB, B]]].newBuilder
       for (k, v) <- from.iterator do builder.addOne(keyTansform.transform(k) -> valueTransform.transform(v))
       builder.result
-    })
+    }
   end deriveMap
 
   inline def deriveCollectionF[F[_], A, B, Flags <: Tuple, Path <: String](using Factory[B, _], TransformerFSupport[F]): TransformerF[F, IterableOnce[A], Any] = 
@@ -140,7 +140,7 @@ object SpecialDerive:
       case _ => 
         TransformerDerive.deriveConfiguredF[F, A, B, Concat[Path, "F[[*]]"]](configOfAtPath[B, Flags, Concat[Path, "F[[*]]"]](defaultDefinitionWithFlags))
     }
-    new SpecialDeriveF[F, IterableOnce[A], Any](from => summon[TransformerFSupport[F]].traverse(from.iterator, elemTransform.transform))
+    transformerWithF[F, IterableOnce[A], Any](from => summon[TransformerFSupport[F]].traverse(from.iterator, elemTransform.transform))
   
 
   inline def deriveSupport[F[_], From, To, Flags <: Tuple, Path <: String](using TransformerFSupport[F]): Transformer[F[From], F[To]] =
@@ -149,12 +149,6 @@ object SpecialDerive:
       case _ =>
         TransformerDerive.deriveConfigured[From, To, Concat[Path, "F[*]"]](configOfAtPath[To, Flags, Concat[Path, "F[*]"]](defaultDefinitionWithFlags))
     }
-    new SpecialDerive[F[From], F[To]](summon[TransformerFSupport[F]].map(_, underlyingTransform.transform))
+    transformerWith[F[From], F[To]](summon[TransformerFSupport[F]].map(_, underlyingTransform.transform))
 
-
-  class SpecialDerive[From, To](impl: From => To) extends Transformer[From, To]:
-    def transform(from: From): To = impl(from)
-
-  class SpecialDeriveF[F[_], From, To](impl: From => F[To]) extends TransformerF[F, From, To]:
-    def transform(from: From): F[To] = impl(from)
 end SpecialDerive

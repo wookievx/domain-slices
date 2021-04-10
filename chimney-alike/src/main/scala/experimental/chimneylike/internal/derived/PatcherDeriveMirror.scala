@@ -132,14 +132,14 @@ object PatcherDeriveProduct:
       case _: Option[ptype] =>
         patch(patchPosition).asInstanceOf[Option[ptype]] match
           case Some(patchValue) =>
-            target(targetPosition) = Some(handleUnpackedTypes[TType, ptype, Config, Path](patchValue, target(targetPosition).asInstanceOf[TType]))
+            target(targetPosition) = handleUnpackedOptTypes[TType, ptype, Config, Path](patchValue, target(targetPosition).asInstanceOf[Option[TType]])
           case None =>
             inline if constValue[HasPatcherCfg[Config, PatcherCfg.IgnoreNoneInPatch]] then
               {}
             else
               target(targetPosition) = None
       case _ =>
-        target(targetPosition) = Some(handleUnpackedTypes[TType, PType, Config, Path](patch(patchPosition).asInstanceOf[PType], target(targetPosition).asInstanceOf[TType]))
+        target(targetPosition) = handleUnpackedOptTypes[TType, PType, Config, Path](patch(patchPosition).asInstanceOf[PType], target(targetPosition).asInstanceOf[Option[TType]])
   }
 
   private inline def handleOtherTarget[TType, PType, Config <: Tuple, Path <: String](
@@ -161,23 +161,47 @@ object PatcherDeriveProduct:
   private inline def handleUnpackedTypes[TType, PType, Config <: Tuple, Path <: String](
     patchValue: PType,
     targetValue: TType
-  ): Any =
+  ): TType =
     inline erasedValue[PType] match
       case _: TType =>
         printAtCompileTime["Applying value at: " Concat Path]
-        patchValue
+        patchValue.asInstanceOf[TType]
       case _ =>
         summonFrom {
           case p: Patcher[TType, PType] =>
+            p.patch(targetValue, patchValue)
           case _ =>
             inline SpecialPatcherDerive.deriveSpecialCases[TType, PType, Config, Path] match
               case Some(p: Patcher[TType, PType]) =>
                 printAtCompileTime["Used special cases at: " Concat Path]
                 p.patch(targetValue, patchValue)
               case None =>
-                printAtCompileTime["Unable to use special cases at" Concat Path]
+                printAtCompileTime["Using regular cases at" Concat Path]
                 PatcherDerive.derived[TType, PType, Config, Path].patch(targetValue, patchValue)
         }
+
+  private inline def handleUnpackedOptTypes[TType, PType, Config <: Tuple, Path <: String](
+    patchValue: PType,
+    targetValue: Option[TType]
+  ): Option[TType] =
+    inline erasedValue[PType] match
+      case _: TType =>
+        printAtCompileTime["Applying value at: " Concat Path]
+        Some(patchValue).asInstanceOf[Option[TType]]
+      case _ =>
+        summonFrom {
+          case p: Patcher[TType, PType] =>
+            targetValue.map(p.patch(_, patchValue))
+          case _ =>
+            inline SpecialPatcherDerive.deriveSpecialCases[TType, PType, Config, Path] match
+              case Some(p: Patcher[TType, PType]) =>
+                printAtCompileTime["Used special cases at: " Concat Path]
+                targetValue.map(p.patch(_, patchValue))
+              case None =>
+                printAtCompileTime["Using regular cases at" Concat Path]
+                targetValue.map(PatcherDerive.derived[TType, PType, Config, Path].patch(_, patchValue))
+        }
+  end handleUnpackedOptTypes
 
 end PatcherDeriveProduct
 

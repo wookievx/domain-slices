@@ -11,19 +11,15 @@ import scala.deriving._
 object CoproductDerive:
   import DeriveUtils._
 
-  class GenericTransformer[From, To](transformImpl: From => To) extends Transformer[From, To]:
-    def transform(from: From): To = transformImpl(from)
-
-  class GenericFTransformer[F[_], From, To](transformImpl: From => F[To]) extends TransformerF[F, From, To]:
-    def transform(from: From): F[To] = transformImpl(from)
-
   inline def derived[From, To, Path <: String](inline config: TypeDeriveConfig[_, _, Path])(using fm: Mirror.SumOf[From], tm: Mirror.SumOf[To]): Transformer[From, To] =
-    GenericTransformer(findACase[From, To, fm.MirroredElemTypes, tm.MirroredElemTypes, fm.MirroredElemLabels, 0](config)(_))
+    DeriveUtils.transformerWith[From,  To] { from => findACase[From, To, fm.MirroredElemTypes, tm.MirroredElemTypes, fm.MirroredElemLabels, 0](config)(from) }
+  end derived
 
   inline def derivedF[F[_], From, To, Path <: String](inline config: TypeDeriveConfig[_, _, Path])(using fm: Mirror.SumOf[From], tm: Mirror.SumOf[To], sup: TransformerFSupport[F]): TransformerF[F, From, To] =
-    GenericFTransformer(findACaseF[F, From, To, fm.MirroredElemTypes, tm.MirroredElemTypes, fm.MirroredElemLabels, 0](config)(_))
+    DeriveUtils.transformerWithF[F, From, To](from => findACaseF[F, From, To, fm.MirroredElemTypes, tm.MirroredElemTypes, fm.MirroredElemLabels, 0](config)(from))
+  end derivedF
 
-  inline def findACase[From, To, FromLeft <: Tuple, ToLeft <: Tuple, Labels <: Tuple, Position <: Int](inline config: TypeDeriveConfig[_, _, _])(from: From)(using fm: Mirror.SumOf[From]): To = 
+  inline def findACase[From, To, FromLeft <: Tuple, ToLeft <: Tuple, Labels <: Tuple, Position <: Int](inline config: TypeDeriveConfig[_, _, _])(from: From)(using fm: Mirror.SumOf[From]): To =
     inline (erasedValue[FromLeft], erasedValue[ToLeft], erasedValue[Labels]) match
       case _: (from *: fromLeft, to *: toLeft, fromName *: labels) =>
         if fm.ordinal(from) == constValue[Position] then
@@ -32,7 +28,7 @@ object CoproductDerive:
               inline SpecialDerive.deriveSpecialCases[from, to, flags, path Concat "." Concat fromName] match
                 case Some(t: Transformer[from, to]) =>
                   t.asInstanceOf[Transformer[From, To]].transform(from)
-                case _ =>  
+                case _ =>
                   TransformerDerive.deriveConfigured[from, to, path Concat "." Concat fromName](configOfAtPath[to, flags, path Concat "." Concat fromName](defaultDefinitionWithFlags))
                     .asInstanceOf[Transformer[From, To]]
                     .transform(from)
@@ -50,10 +46,10 @@ object CoproductDerive:
     inline config: TypeDeriveConfig[_, _, _]
   )(
     from: From
-  )(using 
+  )(using
     fm: Mirror.SumOf[From],
     sup: TransformerFSupport[F]
-  ): F[To] = 
+  ): F[To] =
     inline (erasedValue[FromLeft], erasedValue[ToLeft], erasedValue[Labels]) match
       case _: (from *: fromLeft, to *: toLeft, fromName *: labels) =>
         if fm.ordinal(from) == constValue[Position] then
@@ -64,17 +60,18 @@ object CoproductDerive:
                   sup.pure(t.asInstanceOf[Transformer[From, To]].transform(from))
                 case Some(t: TransformerF[F, from, to]) =>
                   t.asInstanceOf[TransformerF[F, From, To]].transform(from)
-                case _ =>  
+                case _ =>
                   TransformerDerive.deriveConfiguredF[F, from, to, path Concat "." Concat fromName](configOfAtPath[to, flags, path Concat "." Concat fromName](defaultDefinitionWithFlags))
                     .asInstanceOf[TransformerF[F, From, To]]
                     .transform(from)
         else
           findACaseF[F, From, To, fromLeft, toLeft, labels, Position + 1](config)(from)
-      case _: (EmptyTuple, EmptyTuple, _) => 
+      case _: (EmptyTuple, EmptyTuple, _) =>
         throw new Exception("Should not be here, bug in implementation, report it")
       case _ =>
         inline config match
           case _: TypeDeriveConfig[_, _, path] =>
             MacroUtils.reportErrorAtPath(constValue[path], "Structure of transformed coproducts do not match")
   end findACaseF
+
 end CoproductDerive
