@@ -78,6 +78,7 @@ object MacroUtils:
           case Inlined(_, _, nested) => InlinedLambda.unapply(nested)
           case t => None
     end InlinedLambda
+    
   end Extractors
 
   inline def debug[T](inline any: T): T = ${ printImplMacro('any) }
