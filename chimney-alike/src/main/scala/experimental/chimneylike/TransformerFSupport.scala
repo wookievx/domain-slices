@@ -77,4 +77,25 @@ object TransformerFSupport:
       if (wasNone) None else Some(b.result())
     end traverse
 
+  given eitherSupport[E]: TransformerFSupport[[T] =>> Either[E, T]] with
+    def pure[A](value: A): Either[E, A] = Right(value)
+    def product[A, B](fa: Either[E, A], fb: => Either[E, B]): Either[E, (A, B)] =
+      for
+        a <- fa
+        b <- fb
+      yield (a, b)
+
+    def map[A, B](fa: Either[E, A], f: A => B): Either[E, B] = fa.map(f)
+
+    def traverse[M, A, B](it: Iterator[A], f: A => Either[E, B])(using fac: Factory[B, M]): Either[E, M] =
+      val b = fac.newBuilder
+      var error: Either[E, M] = null
+      while (error eq null) && it.hasNext do
+        f(it.next()) match
+          case l: Left[E, _] => error = l.asInstanceOf[Either[E, M]]
+          case Right(v) => b += v
+      if (error eq null) Right(b.result()) else error
+    end traverse
+
+
 end TransformerFSupport

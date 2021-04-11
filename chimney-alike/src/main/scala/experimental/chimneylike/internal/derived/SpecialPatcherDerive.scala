@@ -15,7 +15,7 @@ object SpecialPatcherDerive:
     def patch(obj: T, patch: T): T = patch
 
   transparent inline def deriveSpecialCases[T, P, Config <: Tuple, Path <: String]: Option[Patcher[T, P]] =
-    MacroUtils.printAtCompileTime["Attempting to derive special cases at: " Concat Path]
+//    MacroUtils.printAtCompileTime["Attempting to derive special cases at: " Concat Path]
     inline erasedValue[P] match
       case _: Map[k, pv] =>
         inline erasedValue[T] match

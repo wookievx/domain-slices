@@ -16,7 +16,7 @@ object PatcherDeriveProduct:
   import DeriveUtils.Concat
 
   inline def deriveProduct[T, P, Config <: Tuple, Path <: String](using tm: Mirror.ProductOf[T], pm: Mirror.ProductOf[P]): Patcher[T, P] = {
-    printAtCompileTime["Deriving product at: " Concat Path]
+//    printAtCompileTime["Deriving product at: " Concat Path]
     new Patcher[T, P]:
       def patch(obj: T, patch: P): T =
         val input = Tuple.fromProduct(patch.asInstanceOf[Product]).toIArray
@@ -32,7 +32,7 @@ object PatcherDeriveProduct:
   }
 
   inline def deriveProductN[T, P <: Tuple, Config <: Tuple](using tm: Mirror.ProductOf[T]): Patcher[T, P] =
-    printAtCompileTime["Deriving product of n patchers"]
+//    printAtCompileTime["Deriving product of n patchers"]
     new Patcher[T, P]:
       def patch(obj: T, patch: P): T =
         val output = Tuple.fromProduct(obj.asInstanceOf[Product]).toArray
@@ -43,18 +43,16 @@ object PatcherDeriveProduct:
   private[derived] inline def deriveProducNImpl[T, P <: Tuple, Config <: Tuple, Pos <: Int](target: Array[Any], patch: P)(using tm: Mirror.ProductOf[T]): Unit =
     inline erasedValue[P] match
       case _: (p *: patches) =>
-        showType[p]
         inline summonProductOf[p] match
           case pm: Mirror.ProductOf[p] =>
             deriveInplace[T, p, Config, Pos](using tm, pm).patch(target, patch.asInstanceOf[NonEmptyTuple].head.asInstanceOf[p])
           case _ =>
-            error("WTF")
+            reportErrorAtPathWithType["Update number: " Concat ToString[Pos], "", p]("Missing product instance")
         deriveProducNImpl[T, patches, Config, Pos + 1](target, patch.asInstanceOf[NonEmptyTuple].tail.asInstanceOf[patches])
       case _: EmptyTuple =>
   end deriveProducNImpl
 
   private[derived] inline def deriveInplace[T, P, Config <: Tuple, Pos <: Int](using tm: Mirror.ProductOf[T], pm: Mirror.ProductOf[P]): Patcher[Array[Any], P] =
-    printAtCompileTime[Concat["Deriving inplace patcher at: ", ToString[Pos]]]
     new Patcher[Array[Any], P]:
       def patch(obj: Array[Any], patch: P): Array[Any] =
         val input = Tuple.fromProduct(patch.asInstanceOf[Product]).toIArray
@@ -77,7 +75,6 @@ object PatcherDeriveProduct:
   ): Unit =
     inline (erasedValue[PFields], erasedValue[PTypes]) match
       case _: (pField *: pFields, pType *: pTypes) =>
-        printAtCompileTime["Looking up: " Concat pField Concat " at " Concat Path]
         applyField[pField, pType, TFields, TTypes, Config, Path Concat "." Concat pField, T](
           patchPosition = patchPosition,
           targetPosition = targetPosition
@@ -104,10 +101,8 @@ object PatcherDeriveProduct:
   ): Unit =
     inline (erasedValue[TFields], erasedValue[TTypes]) match
       case _: (PField *: _, Option[tType] *: _) =>
-        printAtCompileTime["Having optional target: " Concat PField Concat " at " Concat Path]
         handleOptionTarget[tType, PType, Config, Path](patchPosition, targetPosition)(patch, target)
       case _: (PField *: _, tType *: _) =>
-        printAtCompileTime["Having regular target: " Concat PField Concat " at " Concat Path]
         handleOtherTarget[tType, PType, Config, Path](patchPosition, targetPosition)(patch, target)
       case _: (_ *: tfields, _ *: ttypes) =>
         applyField[PField, PType, tfields, ttypes, Config, Path, T](
@@ -164,7 +159,6 @@ object PatcherDeriveProduct:
   ): TType =
     inline erasedValue[PType] match
       case _: TType =>
-        printAtCompileTime["Applying value at: " Concat Path]
         patchValue.asInstanceOf[TType]
       case _ =>
         summonFrom {
@@ -173,10 +167,8 @@ object PatcherDeriveProduct:
           case _ =>
             inline SpecialPatcherDerive.deriveSpecialCases[TType, PType, Config, Path] match
               case Some(p: Patcher[TType, PType]) =>
-                printAtCompileTime["Used special cases at: " Concat Path]
                 p.patch(targetValue, patchValue)
               case None =>
-                printAtCompileTime["Using regular cases at" Concat Path]
                 PatcherDerive.derived[TType, PType, Config, Path].patch(targetValue, patchValue)
         }
 
@@ -186,7 +178,6 @@ object PatcherDeriveProduct:
   ): Option[TType] =
     inline erasedValue[PType] match
       case _: TType =>
-        printAtCompileTime["Applying value at: " Concat Path]
         Some(patchValue).asInstanceOf[Option[TType]]
       case _ =>
         summonFrom {
@@ -195,10 +186,8 @@ object PatcherDeriveProduct:
           case _ =>
             inline SpecialPatcherDerive.deriveSpecialCases[TType, PType, Config, Path] match
               case Some(p: Patcher[TType, PType]) =>
-                printAtCompileTime["Used special cases at: " Concat Path]
                 targetValue.map(p.patch(_, patchValue))
               case None =>
-                printAtCompileTime["Using regular cases at" Concat Path]
                 targetValue.map(PatcherDerive.derived[TType, PType, Config, Path].patch(_, patchValue))
         }
   end handleUnpackedOptTypes
@@ -209,7 +198,6 @@ object PatcherDeriveCoproduct:
   import DeriveUtils.Concat
 
   inline def deriveCoproduct[T, P, Config <: Tuple, Path <: String](using tm: Mirror.SumOf[T], pm: Mirror.SumOf[P]): Patcher[T, P] =
-    printAtCompileTime["Deriving coproduct at: " Concat Path]
     new Patcher[T, P]:
       def patch(obj: T, patch: P): T =
         findACase[T, P, tm.MirroredElemTypes, pm.MirroredElemTypes, pm.MirroredElemLabels, 0, Config, Path](obj, patch)
@@ -230,6 +218,6 @@ object PatcherDeriveCoproduct:
       case _: (EmptyTuple, EmptyTuple, _) =>
         throw new Exception("Should not be here, bug in implementation, report it")
       case _ =>
-        error(constValue["Structured of patch and target coproducts do not match, encountered at: " Concat Path])
+        error(constValue["Structure of patch and target coproducts do not match, encountered at: " Concat Path])
 
 end PatcherDeriveCoproduct

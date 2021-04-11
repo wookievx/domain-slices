@@ -15,82 +15,85 @@ object AdvancedSpec extends TestSuite {
   val tests = Tests {
     "Library" - {
 
-      "correctly transforms and patches updates" - {
-
-        val initialState = Event(
-          eventId(11),
-          eventName("an event"),
-          Map(
-            marketId(1) -> Market(
-              marketId(1),
-              marketName("one"),
-              Map(
-                selectionId(1) -> Selection(
-                  selectionId(1),
-                  selectionName("first"),
-                  price(BigDecimal(1)),
-                  None
-                ),
-                selectionId(2) -> Selection(
-                  selectionId(2),
-                  selectionName("first"),
-                  price(BigDecimal(1)),
-                  None
-                )
+      val initialState = Event(
+        eventId(11),
+        eventName("an event"),
+        Map(
+          marketId(1) -> Market(
+            marketId(1),
+            marketName("one"),
+            Map(
+              selectionId(1) -> Selection(
+                selectionId(1),
+                selectionName("first"),
+                price(BigDecimal(1)),
+                None
               ),
+              selectionId(2) -> Selection(
+                selectionId(2),
+                selectionName("first"),
+                price(BigDecimal(1)),
+                None
+              )
             ),
-            marketId(2) -> Market(
-              marketId(2),
-              marketName("two"),
-              Map(
-                selectionId(1) -> Selection(
-                  selectionId(1),
-                  selectionName("first"),
-                  price(BigDecimal(1)),
-                  None
-                ),
-                selectionId(2) -> Selection(
-                  selectionId(2),
-                  selectionName("first"),
-                  price(BigDecimal(1)),
-                  None
-                )
+          ),
+          marketId(2) -> Market(
+            marketId(2),
+            marketName("two"),
+            Map(
+              selectionId(1) -> Selection(
+                selectionId(1),
+                selectionName("first"),
+                price(BigDecimal(1)),
+                None
               ),
-            )
+              selectionId(2) -> Selection(
+                selectionId(2),
+                selectionName("first"),
+                price(BigDecimal(1)),
+                None
+              )
+            ),
           )
         )
+      )
 
-        val updateOne: ModifyRawEvent.PatchEvent = ModifyRawEvent.PatchEvent(rawEventId(11), Some(rawEventName("the event")), Map.empty)
-        val updateTwo: ModifyRawEvent.PatchEvent = ModifyRawEvent.PatchEvent(
-          rawEventId(11),
-          None,
-          Map(
-            rawMarketId(1) -> PatchRawMarket(
-              Some(rawMarketName("patched one")),
-              List(PatchRawSelection(rawSelectionId(1), None, None, Some(SelectionResult.Won)))
-            )
+      val updateOne: ModifyRawEvent.PatchEvent = ModifyRawEvent.PatchEvent(rawEventId(11), Some(rawEventName("the event")), Map.empty)
+      val updateTwo: ModifyRawEvent.PatchEvent = ModifyRawEvent.PatchEvent(
+        rawEventId(11),
+        None,
+        Map(
+          rawMarketId(1) -> PatchRawMarket(
+            Some(rawMarketName("patched one")),
+            List(PatchRawSelection(rawSelectionId(1), None, None, Some(SelectionResult.Won)))
           )
         )
+      )
 
-        val updateRemoving: ModifyRawEvent.UpdateEvent = ModifyRawEvent.UpdateEvent(
-          rawEventId(11),
-          rawEventName("the event"),
-          Map(
-            rawMarketId(2) -> UpdateRawMarket(
-              rawMarketId(2),
-              rawMarketName("patched two"),
-              List.empty
-            )
+      val updateRemoving: ModifyRawEvent.UpdateEvent = ModifyRawEvent.UpdateEvent(
+        rawEventId(11),
+        rawEventName("the event"),
+        Map(
+          rawMarketId(2) -> UpdateRawMarket(
+            rawMarketId(2),
+            rawMarketName("patched two"),
+            List.empty
           )
         )
+      )
 
-        val resulting: Event = initialState
+      def updateEvent(event: Event): Event =
+        event
           .using(transformPatch(updateOne))
           .and(transformPatch(updateTwo))
           .and(transformUpdate(updateRemoving))
           .overwriteIterablesOnTheSameType
           .ignoreNoneInPatch
           .patch
+
+      "correctly transforms and patches updates" - {
+
+        val resulting: Event = updateEvent(initialState)
 
         assert(
           resulting == Event(
@@ -124,6 +127,18 @@ object AdvancedSpec extends TestSuite {
           )
         )
 
+      }
+
+      "runs multiple transformations quickly" - {
+
+        val firstResult = updateEvent(initialState)
+        var resulting: Event = null
+        for _ <- 1 to 1000 do
+            resulting = updateEvent(initialState)
+
+        assert(
+          resulting == firstResult
+        )
       }
 
     }
