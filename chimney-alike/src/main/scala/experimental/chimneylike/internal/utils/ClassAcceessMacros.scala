@@ -8,7 +8,17 @@ object ClassAcceessMacros:
   transparent inline def selectByName[C](cValue: C, inline name: String) = ${selectByNameImpl('cValue, 'name) }
 
   private def selectByNameImpl[C: Type](cValue: Expr[C], name: Expr[String])(using q: Quotes): Expr[Any] =
-    '{None}
+    import q.reflect._
+    name.value match
+      case Some(name) =>
+        findMethod[C](name) match
+          case Some(tpe) =>
+            val extracted = Typed(Select.unique(cValue.asTerm, name), tpe).asExpr
+            '{Some($extracted)}
+          case None =>
+            '{None}
+      case None =>
+        report.throwError("Failed to extract name, a bug library")
   end selectByNameImpl
 
   private def findMethod[C: Type](name: String)(using q: Quotes): Option[q.reflect.TypeTree] =
