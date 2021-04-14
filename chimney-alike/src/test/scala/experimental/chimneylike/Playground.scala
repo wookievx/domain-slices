@@ -16,8 +16,8 @@ object Playground extends TestSuite:
 
       assert(
         resExpected == Right("42"),
-        resWrongType == Left("illegal field type: Int"),
-        resNotFound == Left(s"not found theField")
+        resWrongType == Left("illegal field type: scala.Int"),
+        resNotFound == Left(s"not found: field")
       )
     }
   }
