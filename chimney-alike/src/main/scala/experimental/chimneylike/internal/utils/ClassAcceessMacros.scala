@@ -5,7 +5,16 @@ import deriving._, compiletime._
 
 object ClassAcceessMacros:
 
-  transparent inline def selectByName[C](cValue: C, inline name: String) = ${selectByNameImpl('cValue, 'name) }
+  transparent inline def selectByName[C](cValue: C, inline name: Any) = ${selectByNameAny('cValue, 'name) }
+
+  private def selectByNameAny[C: Type](cValue: Expr[C], name: Expr[Any])(using q: Quotes): Expr[Any] = 
+    import q.reflect.report
+    name match
+      case '{$n: String} =>
+        selectByNameImpl(cValue, n)
+      case _ =>
+        report.throwError("Failed to extract name it is not a string for some reason")
+  end selectByNameAny
 
   private def selectByNameImpl[C: Type](cValue: Expr[C], name: Expr[String])(using q: Quotes): Expr[Any] =
     import q.reflect._

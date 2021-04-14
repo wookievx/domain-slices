@@ -127,9 +127,9 @@ object DeriveProduct:
             val f = config.overrides(constValue[Name].asInstanceOf).asInstanceOf[From => Any]
             outputArray(constValue[At]) = f(input)
           case _: FieldRelabelled[fieldFrom, Name] =>
-            extractFromSource[At, fieldFrom, T, From, To, flags](config, fm)(outputArray, inputArray)
+            extractFromSource[At, fieldFrom, T, From, To, flags](config, fm)(outputArray, inputArray, input)
           case _ => 
-            extractFromSource[At, Name, T, From, To, flags](config, fm)(outputArray, inputArray)
+            extractFromSource[At, Name, T, From, To, flags](config, fm)(outputArray, inputArray, input)
   end handleTargetField       
 
   inline def handleTargetFieldWithF[F[_], At <: Int, Name, T, From, To](
@@ -171,12 +171,12 @@ object DeriveProduct:
             )
           case _: FieldRelabelled[fieldFrom, Name] =>
             sup.map(outputArray, outputArray =>
-              extractFromSource[At, fieldFrom, T, From, To, flags](config, fm)(outputArray, inputArray)
+              extractFromSource[At, fieldFrom, T, From, To, flags](config, fm)(outputArray, inputArray, input)
               outputArray
             )
           case _ => 
             sup.map(outputArray, outputArray =>
-              extractFromSource[At, Name, T, From, To, flags](config, fm)(outputArray, inputArray)
+              extractFromSource[At, Name, T, From, To, flags](config, fm)(outputArray, inputArray, input)
               outputArray
             )
   end handleTargetFieldWithF
@@ -184,13 +184,13 @@ object DeriveProduct:
   inline def extractFromSource[TargetAt <: Int, LabelAt, TypeAt, From, To, Flags <: Tuple](
     inline config: TypeDeriveConfig[_, Flags, _],
     fm: Mirror.ProductOf[From]
-  )(outputArray: Array[Any], inputArray: IArray[Any]): Unit = 
+  )(outputArray: Array[Any], inputArray: IArray[Any], typedInput: From): Unit = 
     findInSource[From, To, LabelAt, fm.MirroredElemLabels, TypeAt, fm.MirroredElemTypes, 0](
-      config)(outputArray, inputArray, constValue[TargetAt])
+      config)(outputArray, inputArray, typedInput, constValue[TargetAt])
     
 
   inline def findInSource[From, To, Field, SourceFields <: Tuple, Tpe, SourceTypes <: Tuple, Pos <: Int](
-    inline config: TypeDeriveConfig[_, _, _])(outputArray: Array[Any], inputArray: IArray[Any], targetPosition: Int): Unit = 
+    inline config: TypeDeriveConfig[_, _, _])(outputArray: Array[Any], inputArray: IArray[Any], typedInput: From, targetPosition: Int): Unit = 
     inline config match
       case c: TypeDeriveConfig[_, flags, path] =>
         inline (erasedValue[SourceFields], erasedValue[SourceTypes]) match
@@ -211,15 +211,11 @@ object DeriveProduct:
                       .asInstanceOf[Transformer[Any, Tpe]]
                       .transform(inputArray(constValue[Pos]))
           case _: (_ *: sourceFields, _ *: sourceTypes) =>
-            findInSource[From, To, Field, sourceFields, Tpe, sourceTypes, Pos + 1](config)(outputArray, inputArray, targetPosition)
+            findInSource[From, To, Field, sourceFields, Tpe, sourceTypes, Pos + 1](config)(outputArray, inputArray, typedInput, targetPosition)
           case _: (EmptyTuple, _) =>
-            inline if constValue[HasAFlag[flags, TransformerFlag.DefaultValues]] then
-              inline if MacroUtils.defaultValueExistsIn[To](constValue[Field]) then
-                outputArray(targetPosition) = config.defaults(constValue[Field].asInstanceOf)
-              else
-                MacroUtils.reportErrorAtPathWithType[path, Concat["missing default: ", Field], To]("Unable to find default value in target when its missing from source")
-              else
-              error(constValue["Failed to locate a field in source class, when deriving at" Concat path])
+            specialExtractors[flags, path, From, To, Field](c, typedInput) { extracted =>
+              outputArray(targetPosition) = extracted
+            }
   end findInSource
 
   inline def findInSourceWithF[F[_], From, To, Field, SourceFields <: Tuple, Tpe, SourceTypes <: Tuple, Pos <: Int](
@@ -227,6 +223,7 @@ object DeriveProduct:
   )(
     outputArray: F[Array[Any]], 
     inputArray: IArray[Any], 
+    typedInput: From,
     targetPosition: Int
   )(using sup: TransformerFSupport[F]): Unit = 
     inline config match
@@ -264,17 +261,36 @@ object DeriveProduct:
                       .transform(inputArray(constValue[Pos]))
             }
           case _: (_ *: sourceFields, _ *: sourceTypes) =>
-            findInSourceWithF[F, From, To, Field, sourceFields, Tpe, sourceTypes, Pos + 1](config)(outputArray, inputArray, targetPosition)
+            findInSourceWithF[F, From, To, Field, sourceFields, Tpe, sourceTypes, Pos + 1](config)(outputArray, inputArray, typedInput, targetPosition)
           case _: (EmptyTuple, _) =>
-            inline if constValue[HasAFlag[flags, TransformerFlag.DefaultValues]] then
-              inline if MacroUtils.defaultValueExistsIn[To](constValue[Field]) then
-                sup.map(outputArray, outputArray => outputArray(targetPosition) = config.defaults(constValue[Field].asInstanceOf))
-              else 
-                error(constValue["Unable to find default value in target when its missing from source, when deriving at: " Concat path])
-            else
-              error(constValue["Failed to locate a field in source class, when deriving at" Concat path])
+            specialExtractors[flags, path, From, To, Field](c, typedInput) { extracted =>
+              sup.map(outputArray, outputArray => outputArray(targetPosition) = extracted)
+            }
   end findInSourceWithF
 
+  private inline def specialExtractors[Flags <: Tuple, Path <: String, From, To, Field](inline config: TypeDeriveConfig[_, Flags, Path], from: From)(inline onAccess: Any => Unit): Unit =
+    inline extractDefault[Flags, To, Field](config) match
+      case Some(value) => onAccess(value)
+      case None => 
+        inline extractByMethod[Flags, From, Field](config, from) match
+          case Some(value) => onAccess(value)
+          case None => error(constValue["Unable to find default value in target or method of a name (or those options are disabled), when deriving at: " Concat Path])
+  end specialExtractors
+
+  private transparent inline def extractDefault[Flags <: Tuple, To, Field](inline config: TypeDeriveConfig[_, Flags, _]) =
+    inline if constValue[HasAFlag[Flags, TransformerFlag.DefaultValues]] then
+      inline if MacroUtils.defaultValueExistsIn[To](constValue[Field]) then
+        Some(config.defaults(constValue[Field].asInstanceOf))
+      else None
+    else None
+  end extractDefault
+
+  private transparent inline def extractByMethod[Flags <: Tuple, From, Field](inline config: TypeDeriveConfig[_, Flags, _], from: From) =
+    inline if constValue[HasAFlag[Flags, TransformerFlag.MethodAccessors]] then
+      ClassAcceessMacros.selectByName(from, constValue[Field])
+    else 
+      None
+  end extractByMethod
   
 end DeriveProduct
 
