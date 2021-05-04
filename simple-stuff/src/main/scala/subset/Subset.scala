@@ -1,6 +1,6 @@
 package subset
-import scala.deriving.*
-import scala.compiletime.*
+import scala.deriving._
+import scala.compiletime._
 import scala.compiletime.ops.int._
 import scala.collection.mutable.Builder
 import util.DebugUtils
@@ -32,19 +32,17 @@ object SubsetOf:
     }
 
   inline def deriveProductConcrete[S, T, Concrete <: SubsetOf[S, T]](build: (T => S, (T, S) => T) => Concrete)(using ms: Mirror.ProductOf[S], mt: Mirror.ProductOf[T]): Concrete =
-    DebugUtils.debug {
-      build(
-        (from: T) =>
-          val inputArray = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
-          val outputArray = extractAllFinal[ms.MirroredElemLabels, ms.MirroredElemTypes, mt.MirroredElemLabels, mt.MirroredElemTypes](inputArray)
+    build(
+      (from: T) =>
+        val inputArray = Tuple.fromProduct(from.asInstanceOf[Product]).toIArray
+        val outputArray = extractAllFinal[ms.MirroredElemLabels, ms.MirroredElemTypes, mt.MirroredElemLabels, mt.MirroredElemTypes](inputArray)
           ms.fromProduct(Tuple.fromIArray(outputArray)),
-        (on: T, subset: S) => 
-          val onInputArray = Tuple.fromProduct(on.asInstanceOf[Product]).toIArray
-          val subsetArray = Tuple.fromProduct(subset.asInstanceOf[Product]).toIArray
-          val outputArray = applyAll[ms.MirroredElemLabels, ms.MirroredElemTypes, mt.MirroredElemLabels, mt.MirroredElemTypes](onInputArray, subsetArray)
-          mt.fromProduct(Tuple.fromIArray(outputArray))
+      (on: T, subset: S) =>
+        val onInputArray = Tuple.fromProduct(on.asInstanceOf[Product]).toIArray
+        val subsetArray = Tuple.fromProduct(subset.asInstanceOf[Product]).toIArray
+        val outputArray = applyAll[ms.MirroredElemLabels, ms.MirroredElemTypes, mt.MirroredElemLabels, mt.MirroredElemTypes](onInputArray, subsetArray)
+        mt.fromProduct(Tuple.fromIArray(outputArray))
       )
-    }
     
 
   inline def derive[S, T]: SubsetOf[S, T] = 

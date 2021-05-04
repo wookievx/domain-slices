@@ -1,6 +1,6 @@
 package util
 
-import scala.quoted.*
+import scala.quoted._
 
 object DebugUtils:
 

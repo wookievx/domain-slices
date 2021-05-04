@@ -1,8 +1,8 @@
 package slices
-import scala.deriving.*
-import scala.compiletime.*
+import scala.deriving._
+import scala.compiletime._
 import scala.compiletime.ops.string._
-import scala.quoted.*
+import scala.quoted._
 
 object Slice {
 
